@@ -2,8 +2,13 @@ from flask import Flask, render_template, request
 import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
+import json
 
 app = Flask(__name__)
+
+# 起動時に観測地点一覧を読み込んでおく
+with open("stations.json", "r", encoding="utf-8") as f:
+    STATIONS = json.load(f)
 
 
 def get_monthly_data(area_code, year, month):
@@ -62,7 +67,7 @@ def index():
 
         result = get_cumulative_temperature(area_code, start_date, end_date, base_temp)
 
-    return render_template("index.html", result=result)
+    return render_template("index.html", result=result, stations=STATIONS)
 
 
 if __name__ == "__main__":

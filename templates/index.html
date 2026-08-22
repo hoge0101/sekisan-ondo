@@ -7,7 +7,21 @@
 <body>
     <h1>積算温度計算</h1>
     <form method="POST">
-        <label>観測地点コード: <input type="text" name="area_code" value="47662" required></label><br>
+        <label>都道府県・地方:
+            <select id="prefecture-select">
+                <option value="">選択してください</option>
+                {% for prec_no, pref in stations.items() %}
+                    <option value="{{ prec_no }}">{{ pref.name }}</option>
+                {% endfor %}
+            </select>
+        </label><br>
+
+        <label>観測地点:
+            <select id="station-select" name="area_code" required>
+                <option value="">都道府県を先に選んでください</option>
+            </select>
+        </label><br>
+
         <label>開始日: <input type="date" name="start_date" required></label><br>
         <label>終了日: <input type="date" name="end_date" required></label><br>
         <label>基準温度(℃、任意): <input type="number" name="base_temp" step="0.1"></label><br>
@@ -17,5 +31,31 @@
     {% if result is not none %}
         <h2>積算温度: {{ result }} ℃</h2>
     {% endif %}
+
+    <script>
+        // Python側のstationsデータを、JavaScriptでも使えるようにする
+        const stationsData = {{ stations | tojson }};
+
+        const prefectureSelect = document.getElementById("prefecture-select");
+        const stationSelect = document.getElementById("station-select");
+
+        prefectureSelect.addEventListener("change", function() {
+            const precNo = this.value;
+            stationSelect.innerHTML = "";  // 一旦空にする
+
+            if (!precNo) {
+                stationSelect.innerHTML = '<option value="">都道府県を先に選んでください</option>';
+                return;
+            }
+
+            const stations = stationsData[precNo].stations;
+            stations.forEach(function(station) {
+                const option = document.createElement("option");
+                option.value = station.block_no;
+                option.textContent = station.name;
+                stationSelect.appendChild(option);
+            });
+        });
+    </script>
 </body>
 </html>
