@@ -8,7 +8,7 @@
     <h1>積算温度計算</h1>
     <form method="POST">
         <label>都道府県・地方:
-            <select id="prefecture-select">
+            <select id="prefecture-select" name="prec_no">
                 <option value="">選択してください</option>
                 {% for prec_no, pref in stations.items() %}
                     <option value="{{ prec_no }}">{{ pref.name }}</option>
