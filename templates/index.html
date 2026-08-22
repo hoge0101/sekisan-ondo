@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>積算温度計算</title>
+</head>
+<body>
+    <h1>積算温度計算</h1>
+    <form method="POST">
+        <label>観測地点コード: <input type="text" name="area_code" value="47662" required></label><br>
+        <label>開始日: <input type="date" name="start_date" required></label><br>
+        <label>終了日: <input type="date" name="end_date" required></label><br>
+        <label>基準温度(℃、任意): <input type="number" name="base_temp" step="0.1"></label><br>
+        <button type="submit">計算する</button>
+    </form>
+
+    {% if result is not none %}
+        <h2>積算温度: {{ result }} ℃</h2>
+    {% endif %}
+</body>
+</html>
