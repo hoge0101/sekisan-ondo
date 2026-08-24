@@ -86,7 +86,8 @@
                         <thead>
                             <tr>
                                 <th>日付</th>
-                                <th>気温(℃)</th>
+                                <th>実測(℃)</th>
+                                <th>平年値(℃)</th>
                                 <th>積算(℃)</th>
                             </tr>
                         </thead>
@@ -94,13 +95,8 @@
                             {% for row in daily_series %}
                                 <tr class="{% if not row.is_actual %}row-normal{% endif %}">
                                     <td>{{ row.date.isoformat() }}</td>
-                                    <td>
-                                        {% if row.temp is not none %}
-                                            {{ row.temp }}{% if not row.is_actual %}<span class="normal-mark">平年値</span>{% endif %}
-                                        {% else %}
-                                            ---
-                                        {% endif %}
-                                    </td>
+                                    <td>{{ row.actual if row.actual is not none else '---' }}</td>
+                                    <td>{{ row.normal if row.normal is not none else '---' }}</td>
                                     <td>{{ row.cumulative }}</td>
                                 </tr>
                             {% endfor %}

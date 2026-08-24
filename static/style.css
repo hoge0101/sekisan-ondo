@@ -268,15 +268,3 @@ button[type="submit"]:hover {
 .daily-table tbody tr.row-normal:nth-child(even) {
     background: #fbeddb;
 }
-
-.normal-mark {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: var(--color-accent);
-    color: #fff;
-    font-size: 0.7rem;
-    font-weight: 600;
-    white-space: nowrap;
-}

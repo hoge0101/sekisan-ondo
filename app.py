@@ -75,13 +75,14 @@ def get_normal_daily_temps(prec_no, area_code, month):
 
 
 def get_daily_temperatures(prec_no, area_code, start_date, end_date):
-    """期間内の日ごとの気温を返す。{date: {"temp": 気温, "is_actual": 実測かどうか}}
-    実測値が無い日(未来日、またはまだ観測データが公開されていない日)は日別平年値で代用する。
+    """期間内の日ごとの実測気温と平年値を返す。
+    {date: {"actual": 実測気温(昨日まで、それ以降はNone), "normal": 平年値(全ての日)}}
     """
     today = date.today()
+    yesterday = today - timedelta(days=1)
 
     all_temps = {}
-    fetch_end = min(end_date, today)
+    fetch_end = min(end_date, yesterday)
     if start_date <= fetch_end:
         current = date(start_date.year, start_date.month, 1)
         while current <= fetch_end:
@@ -97,23 +98,22 @@ def get_daily_temperatures(prec_no, area_code, start_date, end_date):
     result = {}
     d = start_date
     while d <= end_date:
-        temp = all_temps.get(d)
-        is_actual = temp is not None
+        actual = all_temps.get(d)
 
-        if temp is None:
-            month = d.month
-            if month not in normal_daily_cache:
-                normal_daily_cache[month] = get_normal_daily_temps(prec_no, area_code, month)
-            temp = normal_daily_cache[month].get(d.day)
+        month = d.month
+        if month not in normal_daily_cache:
+            normal_daily_cache[month] = get_normal_daily_temps(prec_no, area_code, month)
+        normal = normal_daily_cache[month].get(d.day)
 
-        result[d] = {"temp": temp, "is_actual": is_actual}
+        result[d] = {"actual": actual, "normal": normal}
         d += timedelta(days=1)
 
     return result
 
 
 def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0, correction=0):
-    """日ごとの気温・積算温度の推移をリストで返す。
+    """日ごとの実測気温・平年値・積算温度の推移をリストで返す。
+    積算には実測値(昨日まで)があればそれを、無ければ平年値を使う。
     correction: 観測地点の気温と実際の設置場所の気温のズレを補正する一律オフセット(℃)
     """
     daily_temps = get_daily_temperatures(prec_no, area_code, start_date, end_date)
@@ -121,15 +121,22 @@ def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0,
     series = []
     total = 0
     for d, info in daily_temps.items():
-        temp = info["temp"]
-        if temp is not None:
-            temp += correction
+        actual = info["actual"]
+        normal = info["normal"]
+        if actual is not None:
+            actual += correction
+        if normal is not None:
+            normal += correction
+
+        temp = actual if actual is not None else normal
         if temp is not None and temp > base_temp:
             total += (temp - base_temp)
+
         series.append({
             "date": d,
-            "temp": temp,
-            "is_actual": info["is_actual"],
+            "actual": actual,
+            "normal": normal,
+            "is_actual": actual is not None,
             "cumulative": round(total, 1),
         })
 
@@ -184,14 +191,21 @@ def build_chart_svg(series, width=1000, height=500):
 
     max_labels = 12
     label_step = max(1, -(-n // max_labels))
-    for i, s in enumerate(series):
-        if i % label_step == 0 or i == n - 1:
-            x = x_pos(i)
-            label = f'{s["date"].month}/{s["date"].day}'
-            svg_parts.append(
-                f'<text x="{x:.1f}" y="{height - padding_bottom + 25}" font-size="15" '
-                f'text-anchor="middle" fill="#333">{label}</text>'
-            )
+    label_indices = list(range(0, n, label_step))
+    if label_indices[-1] != n - 1:
+        if n - 1 - label_indices[-1] < label_step / 2:
+            label_indices[-1] = n - 1  # 最後のラベルが近すぎる場合は置き換える
+        else:
+            label_indices.append(n - 1)
+
+    for i in label_indices:
+        s = series[i]
+        x = x_pos(i)
+        label = f'{s["date"].month}/{s["date"].day}'
+        svg_parts.append(
+            f'<text x="{x:.1f}" y="{height - padding_bottom + 25}" font-size="15" '
+            f'text-anchor="middle" fill="#333">{label}</text>'
+        )
 
     svg_parts.append(f'<polyline points="{polyline_points}" fill="none" stroke="#2b8ac4" stroke-width="3" />')
 
