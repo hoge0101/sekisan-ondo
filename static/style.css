@@ -94,6 +94,11 @@ body {
     color: var(--color-text-muted);
 }
 
+.required-mark {
+    color: var(--color-accent);
+    margin-left: 2px;
+}
+
 .field select,
 .field input {
     padding: 9px 10px;

@@ -20,8 +20,8 @@
         <section class="card">
             <form method="POST" class="form-grid">
                 <div class="field">
-                    <label for="prefecture-select">都道府県・地方</label>
-                    <select id="prefecture-select" name="prec_no">
+                    <label for="prefecture-select">都道府県・地方<span class="required-mark">※</span></label>
+                    <select id="prefecture-select" name="prec_no" required>
                         <option value="">選択してください</option>
                         {% for prec_no, pref in stations.items() %}
                             <option value="{{ prec_no }}" {% if form.get('prec_no') == prec_no %}selected{% endif %}>{{ pref.name }}</option>
@@ -30,19 +30,19 @@
                 </div>
 
                 <div class="field">
-                    <label for="station-select">観測地点</label>
+                    <label for="station-select">観測地点<span class="required-mark">※</span></label>
                     <select id="station-select" name="area_code" required>
                         <option value="">都道府県を先に選んでください</option>
                     </select>
                 </div>
 
                 <div class="field">
-                    <label for="start_date">開始日</label>
+                    <label for="start_date">開始日<span class="required-mark">※</span></label>
                     <input type="date" id="start_date" name="start_date" value="{{ form.get('start_date', '') }}" required>
                 </div>
 
                 <div class="field">
-                    <label for="end_date">終了日</label>
+                    <label for="end_date">終了日<span class="required-mark">※</span></label>
                     <input type="date" id="end_date" name="end_date" value="{{ form.get('end_date', '') }}" required>
                 </div>
 
