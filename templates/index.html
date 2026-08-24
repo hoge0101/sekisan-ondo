@@ -3,6 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <title>積算温度計算</title>
+    <style>
+        .result-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: flex-start;
+            margin-top: 12px;
+        }
+        .daily-table {
+            border-collapse: collapse;
+        }
+        .daily-table th, .daily-table td {
+            border: 1px solid #ccc;
+            padding: 4px 10px;
+            text-align: right;
+        }
+        .daily-table th {
+            background: #f2f2f2;
+        }
+        .normal-mark {
+            color: #d9822b;
+            font-size: 0.85em;
+            margin-left: 4px;
+        }
+        .chart-area {
+            max-width: 700px;
+        }
+        .chart {
+            width: 100%;
+            height: auto;
+        }
+        .chart-legend {
+            font-size: 0.9em;
+            color: #555;
+        }
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1.5px solid #2b8ac4;
+            margin: 0 4px 0 12px;
+            vertical-align: middle;
+        }
+        .dot.actual {
+            background: #2b8ac4;
+        }
+        .dot.normal {
+            background: #fff;
+        }
+    </style>
 </head>
 <body>
     <h1>積算温度計算</h1>
@@ -11,7 +62,7 @@
             <select id="prefecture-select" name="prec_no">
                 <option value="">選択してください</option>
                 {% for prec_no, pref in stations.items() %}
-                    <option value="{{ prec_no }}">{{ pref.name }}</option>
+                    <option value="{{ prec_no }}" {% if form.get('prec_no') == prec_no %}selected{% endif %}>{{ pref.name }}</option>
                 {% endfor %}
             </select>
         </label><br>
@@ -22,25 +73,60 @@
             </select>
         </label><br>
 
-        <label>開始日: <input type="date" name="start_date" required></label><br>
-        <label>終了日: <input type="date" name="end_date" required></label><br>
-        <label>基準温度(℃、任意): <input type="number" name="base_temp" step="0.1"></label><br>
+        <label>開始日: <input type="date" name="start_date" value="{{ form.get('start_date', '') }}" required></label><br>
+        <label>終了日: <input type="date" name="end_date" value="{{ form.get('end_date', '') }}" required></label><br>
+        <label>基準温度(℃、任意): <input type="number" name="base_temp" step="0.1" value="{{ form.get('base_temp', '') }}"></label><br>
         <button type="submit">計算する</button>
     </form>
 
     {% if result is not none %}
         <h2>積算温度: {{ result }} ℃</h2>
+
+        <div class="result-area">
+            <table class="daily-table">
+                <thead>
+                    <tr>
+                        <th>日付</th>
+                        <th>気温(℃)</th>
+                        <th>積算(℃)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in daily_series %}
+                        <tr>
+                            <td>{{ row.date.isoformat() }}</td>
+                            <td>
+                                {% if row.temp is not none %}
+                                    {{ row.temp }}{% if not row.is_actual %}<span class="normal-mark">(平年値)</span>{% endif %}
+                                {% else %}
+                                    ---
+                                {% endif %}
+                            </td>
+                            <td>{{ row.cumulative }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="chart-area">
+                {{ chart_svg | safe }}
+                <p class="chart-legend">
+                    <span class="dot actual"></span>実測値
+                    <span class="dot normal"></span>平年値(未来日・欠測時)
+                </p>
+            </div>
+        </div>
     {% endif %}
 
     <script>
         // Python側のstationsデータを、JavaScriptでも使えるようにする
         const stationsData = {{ stations | tojson }};
+        const selectedAreaCode = {{ form.get('area_code', '') | tojson }};
 
         const prefectureSelect = document.getElementById("prefecture-select");
         const stationSelect = document.getElementById("station-select");
 
-        prefectureSelect.addEventListener("change", function() {
-            const precNo = this.value;
+        function populateStations(precNo, areaCodeToSelect) {
             stationSelect.innerHTML = "";  // 一旦空にする
 
             if (!precNo) {
@@ -53,9 +139,21 @@
                 const option = document.createElement("option");
                 option.value = station.block_no;
                 option.textContent = station.name;
+                if (station.block_no === areaCodeToSelect) {
+                    option.selected = true;
+                }
                 stationSelect.appendChild(option);
             });
+        }
+
+        prefectureSelect.addEventListener("change", function() {
+            populateStations(this.value, "");
         });
+
+        // 計算結果表示後の再読み込み時に、選択済みの都道府県・観測地点を復元する
+        if (prefectureSelect.value) {
+            populateStations(prefectureSelect.value, selectedAreaCode);
+        }
     </script>
 </body>
 </html>
