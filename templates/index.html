@@ -2,119 +2,114 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>積算温度計算</title>
-    <style>
-        .result-area {
-            margin-top: 12px;
-        }
-        .daily-table {
-            border-collapse: collapse;
-        }
-        .daily-table th, .daily-table td {
-            border: 1px solid #ccc;
-            padding: 4px 10px;
-            text-align: right;
-        }
-        .daily-table th {
-            background: #f2f2f2;
-        }
-        .normal-mark {
-            color: #d9822b;
-            font-size: 0.85em;
-            margin-left: 4px;
-        }
-        .chart-area {
-            max-width: 1000px;
-            margin-bottom: 24px;
-        }
-        .chart {
-            width: 100%;
-            height: auto;
-            min-width: 600px;
-        }
-        .chart-legend {
-            font-size: 0.9em;
-            color: #555;
-        }
-        .dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            border: 1.5px solid #2b8ac4;
-            margin: 0 4px 0 12px;
-            vertical-align: middle;
-        }
-        .dot.actual {
-            background: #2b8ac4;
-        }
-        .dot.normal {
-            background: #fff;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>積算温度計算</h1>
-    <form method="POST">
-        <label>都道府県・地方:
-            <select id="prefecture-select" name="prec_no">
-                <option value="">選択してください</option>
-                {% for prec_no, pref in stations.items() %}
-                    <option value="{{ prec_no }}" {% if form.get('prec_no') == prec_no %}selected{% endif %}>{{ pref.name }}</option>
-                {% endfor %}
-            </select>
-        </label><br>
+    <div class="page">
+        <header class="page-header">
+            <h1>積算温度計算</h1>
+            <p class="subtitle">気象庁の観測データから、指定期間の積算温度を計算します</p>
+        </header>
 
-        <label>観測地点:
-            <select id="station-select" name="area_code" required>
-                <option value="">都道府県を先に選んでください</option>
-            </select>
-        </label><br>
+        {% if error %}
+            <p class="alert">{{ error }}</p>
+        {% endif %}
 
-        <label>開始日: <input type="date" name="start_date" value="{{ form.get('start_date', '') }}" required></label><br>
-        <label>終了日: <input type="date" name="end_date" value="{{ form.get('end_date', '') }}" required></label><br>
-        <label>基準温度(℃、任意): <input type="number" name="base_temp" step="0.1" value="{{ form.get('base_temp', '') }}"></label><br>
-        <button type="submit">計算する</button>
-    </form>
+        <section class="card">
+            <form method="POST" class="form-grid">
+                <div class="field">
+                    <label for="prefecture-select">都道府県・地方</label>
+                    <select id="prefecture-select" name="prec_no">
+                        <option value="">選択してください</option>
+                        {% for prec_no, pref in stations.items() %}
+                            <option value="{{ prec_no }}" {% if form.get('prec_no') == prec_no %}selected{% endif %}>{{ pref.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-    {% if result is not none %}
-        <h2>積算温度: {{ result }} ℃</h2>
+                <div class="field">
+                    <label for="station-select">観測地点</label>
+                    <select id="station-select" name="area_code" required>
+                        <option value="">都道府県を先に選んでください</option>
+                    </select>
+                </div>
 
-        <div class="result-area">
-            <div class="chart-area">
+                <div class="field">
+                    <label for="start_date">開始日</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ form.get('start_date', '') }}" required>
+                </div>
+
+                <div class="field">
+                    <label for="end_date">終了日</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ form.get('end_date', '') }}" required>
+                </div>
+
+                <div class="field">
+                    <label for="base_temp">基準温度(℃、任意)</label>
+                    <input type="number" id="base_temp" name="base_temp" step="0.1" value="{{ form.get('base_temp', '') }}">
+                    <p class="field-hint">この温度を超えた分だけ積算します。未入力の場合は0℃(気温をそのまま積算)として計算します。</p>
+                </div>
+
+                <div class="field">
+                    <label for="correction">気温補正(℃、任意)</label>
+                    <input type="number" id="correction" name="correction" step="0.1" value="{{ form.get('correction', '') }}">
+                    <p class="field-hint">観測地点と実際の場所の気温差を一律で補正します。例: 自宅が観測地点より1.5℃低い場合は -1.5 と入力。</p>
+                </div>
+
+                <div class="field submit-field">
+                    <button type="submit">計算する</button>
+                </div>
+            </form>
+
+            <p class="info-note">※ 今日以降の気温は実測値がまだ無いため、観測地点の平年値(1991〜2020年の日別平均気温)を使って計算します。</p>
+        </section>
+
+        {% if result is not none %}
+            <section class="card result-summary">
+                <span class="result-label">積算温度</span>
+                <span class="result-value">{{ result }}<span class="result-unit">℃</span></span>
+            </section>
+
+            <section class="card chart-card">
                 {{ chart_svg | safe }}
                 <p class="chart-legend">
                     <span class="dot actual"></span>実測値
                     <span class="dot normal"></span>平年値(未来日・欠測時)
                 </p>
-            </div>
+            </section>
 
-            <table class="daily-table">
-                <thead>
-                    <tr>
-                        <th>日付</th>
-                        <th>気温(℃)</th>
-                        <th>積算(℃)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in daily_series %}
-                        <tr>
-                            <td>{{ row.date.isoformat() }}</td>
-                            <td>
-                                {% if row.temp is not none %}
-                                    {{ row.temp }}{% if not row.is_actual %}<span class="normal-mark">(平年値)</span>{% endif %}
-                                {% else %}
-                                    ---
-                                {% endif %}
-                            </td>
-                            <td>{{ row.cumulative }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% endif %}
+            <section class="card table-card">
+                <div class="table-scroll">
+                    <table class="daily-table">
+                        <thead>
+                            <tr>
+                                <th>日付</th>
+                                <th>気温(℃)</th>
+                                <th>積算(℃)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in daily_series %}
+                                <tr class="{% if not row.is_actual %}row-normal{% endif %}">
+                                    <td>{{ row.date.isoformat() }}</td>
+                                    <td>
+                                        {% if row.temp is not none %}
+                                            {{ row.temp }}{% if not row.is_actual %}<span class="normal-mark">平年値</span>{% endif %}
+                                        {% else %}
+                                            ---
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ row.cumulative }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        {% endif %}
+    </div>
 
     <script>
         // Python側のstationsデータを、JavaScriptでも使えるようにする

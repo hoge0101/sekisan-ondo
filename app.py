@@ -112,14 +112,18 @@ def get_daily_temperatures(prec_no, area_code, start_date, end_date):
     return result
 
 
-def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0):
-    """日ごとの気温・積算温度の推移をリストで返す"""
+def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0, correction=0):
+    """日ごとの気温・積算温度の推移をリストで返す。
+    correction: 観測地点の気温と実際の設置場所の気温のズレを補正する一律オフセット(℃)
+    """
     daily_temps = get_daily_temperatures(prec_no, area_code, start_date, end_date)
 
     series = []
     total = 0
     for d, info in daily_temps.items():
         temp = info["temp"]
+        if temp is not None:
+            temp += correction
         if temp is not None and temp > base_temp:
             total += (temp - base_temp)
         series.append({
@@ -215,11 +219,12 @@ def index():
         start_date = date.fromisoformat(request.form["start_date"])
         end_date = date.fromisoformat(request.form["end_date"])
         base_temp = float(request.form.get("base_temp") or 0)
+        correction = float(request.form.get("correction") or 0)
 
         if start_date > end_date:
             error = "開始日は終了日より前の日付を指定してください"
         else:
-            daily_series = get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp)
+            daily_series = get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp, correction)
             result = daily_series[-1]["cumulative"] if daily_series else 0
             chart_svg = build_chart_svg(daily_series)
 
