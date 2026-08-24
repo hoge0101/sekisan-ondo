@@ -132,15 +132,15 @@ def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0)
     return series
 
 
-def build_chart_svg(series, width=700, height=320):
+def build_chart_svg(series, width=1000, height=500):
     """積算温度の推移を折れ線グラフのSVGとして描画する"""
     if not series:
         return ""
 
-    padding_left = 55
-    padding_right = 20
-    padding_top = 20
-    padding_bottom = 45
+    padding_left = 70
+    padding_right = 30
+    padding_top = 30
+    padding_bottom = 60
     plot_w = width - padding_left - padding_right
     plot_h = height - padding_top - padding_bottom
 
@@ -175,26 +175,26 @@ def build_chart_svg(series, width=700, height=320):
             f'stroke="#ddd" stroke-width="1" />'
         )
         svg_parts.append(
-            f'<text x="{padding_left - 8}" y="{y + 4:.1f}" font-size="11" text-anchor="end" fill="#555">{value:.0f}</text>'
+            f'<text x="{padding_left - 10}" y="{y + 5:.1f}" font-size="16" text-anchor="end" fill="#333">{value:.0f}</text>'
         )
 
-    max_labels = 10
+    max_labels = 12
     label_step = max(1, -(-n // max_labels))
     for i, s in enumerate(series):
         if i % label_step == 0 or i == n - 1:
             x = x_pos(i)
             label = f'{s["date"].month}/{s["date"].day}'
             svg_parts.append(
-                f'<text x="{x:.1f}" y="{height - padding_bottom + 18}" font-size="10" '
-                f'text-anchor="middle" fill="#555">{label}</text>'
+                f'<text x="{x:.1f}" y="{height - padding_bottom + 25}" font-size="15" '
+                f'text-anchor="middle" fill="#333">{label}</text>'
             )
 
-    svg_parts.append(f'<polyline points="{polyline_points}" fill="none" stroke="#2b8ac4" stroke-width="2" />')
+    svg_parts.append(f'<polyline points="{polyline_points}" fill="none" stroke="#2b8ac4" stroke-width="3" />')
 
     for (x, y), s in zip(points, series):
         fill = "#2b8ac4" if s["is_actual"] else "#ffffff"
         svg_parts.append(
-            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{fill}" stroke="#2b8ac4" stroke-width="1.5" />'
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{fill}" stroke="#2b8ac4" stroke-width="2" />'
         )
 
     svg_parts.append("</svg>")

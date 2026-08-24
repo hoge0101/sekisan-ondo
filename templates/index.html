@@ -5,10 +5,6 @@
     <title>積算温度計算</title>
     <style>
         .result-area {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 24px;
-            align-items: flex-start;
             margin-top: 12px;
         }
         .daily-table {
@@ -28,11 +24,13 @@
             margin-left: 4px;
         }
         .chart-area {
-            max-width: 700px;
+            max-width: 1000px;
+            margin-bottom: 24px;
         }
         .chart {
             width: 100%;
             height: auto;
+            min-width: 600px;
         }
         .chart-legend {
             font-size: 0.9em;
@@ -83,6 +81,14 @@
         <h2>積算温度: {{ result }} ℃</h2>
 
         <div class="result-area">
+            <div class="chart-area">
+                {{ chart_svg | safe }}
+                <p class="chart-legend">
+                    <span class="dot actual"></span>実測値
+                    <span class="dot normal"></span>平年値(未来日・欠測時)
+                </p>
+            </div>
+
             <table class="daily-table">
                 <thead>
                     <tr>
@@ -107,14 +113,6 @@
                     {% endfor %}
                 </tbody>
             </table>
-
-            <div class="chart-area">
-                {{ chart_svg | safe }}
-                <p class="chart-legend">
-                    <span class="dot actual"></span>実測値
-                    <span class="dot normal"></span>平年値(未来日・欠測時)
-                </p>
-            </div>
         </div>
     {% endif %}
 
