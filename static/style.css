@@ -99,6 +99,28 @@ body {
     margin-left: 2px;
 }
 
+.end-mode-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.radio-label input[type="radio"] {
+    width: auto;
+    margin: 0;
+}
+
 .field select,
 .field input {
     padding: 9px 10px;
@@ -185,6 +207,12 @@ button[type="submit"]:hover {
     font-size: 1.2rem;
     font-weight: 600;
     margin-left: 2px;
+}
+
+.result-date {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    margin-left: 4px;
 }
 
 .chart-card {

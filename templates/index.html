@@ -42,8 +42,28 @@
                 </div>
 
                 <div class="field">
-                    <label for="end_date">終了日<span class="required-mark">※</span></label>
-                    <input type="date" id="end_date" name="end_date" value="{{ form.get('end_date', '') }}" required>
+                    <label>終了日または積算温度指定<span class="required-mark">※</span></label>
+                    <div class="end-mode-toggle">
+                        <label class="radio-label">
+                            <input type="radio" name="end_mode" value="date" id="end-mode-date"
+                                {% if form.get('end_mode', 'date') == 'date' %}checked{% endif %}>
+                            終了日で指定
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="end_mode" value="target" id="end-mode-target"
+                                {% if form.get('end_mode') == 'target' %}checked{% endif %}>
+                            積算温度で指定
+                        </label>
+                    </div>
+
+                    <div id="end-date-field" class="end-mode-input">
+                        <input type="date" id="end_date" name="end_date" value="{{ form.get('end_date', '') }}">
+                    </div>
+                    <div id="target-temp-field" class="end-mode-input">
+                        <input type="number" id="target_temp" name="target_temp" step="0.1" min="0.1"
+                            placeholder="目標積算温度(℃)" value="{{ form.get('target_temp', '') }}">
+                        <p class="field-hint">積算温度がこの値に達した日を終了日として計算します(最大3年先まで)。</p>
+                    </div>
                 </div>
 
                 <div class="field">
@@ -70,6 +90,9 @@
             <section class="card result-summary">
                 <span class="result-label">積算温度</span>
                 <span class="result-value">{{ result }}<span class="result-unit">℃</span></span>
+                {% if reached_date %}
+                    <span class="result-date">({{ reached_date.isoformat() }} 到達)</span>
+                {% endif %}
             </section>
 
             <section class="card chart-card">
@@ -143,6 +166,29 @@
         if (prefectureSelect.value) {
             populateStations(prefectureSelect.value, selectedAreaCode);
         }
+
+        // 終了日 / 積算温度指定の切り替え
+        const endModeRadios = document.querySelectorAll('input[name="end_mode"]');
+        const endDateField = document.getElementById("end-date-field");
+        const targetTempField = document.getElementById("target-temp-field");
+        const endDateInput = document.getElementById("end_date");
+        const targetTempInput = document.getElementById("target_temp");
+
+        function updateEndMode() {
+            const mode = document.querySelector('input[name="end_mode"]:checked').value;
+            const isTarget = mode === "target";
+
+            endDateField.style.display = isTarget ? "none" : "block";
+            targetTempField.style.display = isTarget ? "block" : "none";
+
+            endDateInput.required = !isTarget;
+            targetTempInput.required = isTarget;
+        }
+
+        endModeRadios.forEach(function(radio) {
+            radio.addEventListener("change", updateEndMode);
+        });
+        updateEndMode();
     </script>
 </body>
 </html>
