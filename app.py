@@ -37,30 +37,30 @@ def get_monthly_data(prec_no, area_code, year, month):
     return result
 
 
-def get_normal_monthly_temp(prec_no, area_code, month):
-    """指定した観測地点の、指定した月の平年値(平均気温)を取得する"""
-    url = f"https://www.data.jma.go.jp/stats/etrn/view/nml_sfc_ym.php?prec_no={prec_no}&block_no={area_code}"
+def get_normal_daily_temps(prec_no, area_code, month):
+    """指定した観測地点の、指定した月の日別平年値(平均気温)を取得する。{日: 気温}のdictを返す"""
+    url = f"https://www.data.jma.go.jp/stats/etrn/view/nml_sfc_d.php?prec_no={prec_no}&block_no={area_code}&year=&month={month}&day=1&view="
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
 
-    tables = soup.find_all("table")
-    if not tables:
-        return None
+    target_table = soup.find("table", class_="data2_s")
+    if target_table is None:
+        return {}
 
-    biggest_table = max(tables, key=lambda t: len(t.find_all("tr")))
-    rows = biggest_table.find_all("tr")
+    rows = target_table.find_all("tr")
 
-    target_month_label = f"{month}月"
-
-    for row in rows:
+    result = {}
+    for row in rows[3:]:
         cells = row.find_all(["td", "th"])
         cell_texts = [cell.get_text(strip=True) for cell in cells]
-        if cell_texts and cell_texts[0] == target_month_label:
+        if len(cell_texts) > 2:
             try:
-                return float(cell_texts[4])
-            except (ValueError, IndexError):
-                return None
-    return None
+                day = int(cell_texts[0].rstrip("日"))
+                temp = float(cell_texts[2])
+                result[day] = temp
+            except ValueError:
+                pass
+    return result
 
 
 def get_cumulative_temperature(prec_no, area_code, start_date, end_date, base_temp=0):
@@ -78,7 +78,7 @@ def get_cumulative_temperature(prec_no, area_code, start_date, end_date, base_te
             else:
                 current = date(current.year, current.month + 1, 1)
 
-    normal_temp_cache = {}
+    normal_daily_cache = {}
 
     total = 0
     d = start_date
@@ -87,9 +87,9 @@ def get_cumulative_temperature(prec_no, area_code, start_date, end_date, base_te
             temp = all_temps.get(d)
         else:
             month = d.month
-            if month not in normal_temp_cache:
-                normal_temp_cache[month] = get_normal_monthly_temp(prec_no, area_code, month)
-            temp = normal_temp_cache[month]
+            if month not in normal_daily_cache:
+                normal_daily_cache[month] = get_normal_daily_temps(prec_no, area_code, month)
+            temp = normal_daily_cache[month].get(d.day)
 
         if temp is not None and temp > base_temp:
             total += (temp - base_temp)
