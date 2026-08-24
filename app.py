@@ -46,7 +46,11 @@ def get_monthly_data(prec_no, area_code, year, month):
 
 def get_normal_daily_temps(prec_no, area_code, month):
     """指定した観測地点の、指定した月の日別平年値(平均気温)を取得する。{日: 気温}のdictを返す"""
-    url = f"https://www.data.jma.go.jp/stats/etrn/view/nml_sfc_d.php?prec_no={prec_no}&block_no={area_code}&year=&month={month}&day=1&view="
+    # 観測地点コードが5桁なら官署(nml_sfc_d.php)、4桁ならアメダス(nml_amd_d.php)
+    if len(area_code) == 5:
+        url = f"https://www.data.jma.go.jp/stats/etrn/view/nml_sfc_d.php?prec_no={prec_no}&block_no={area_code}&year=&month={month}&day=1&view="
+    else:
+        url = f"https://www.data.jma.go.jp/stats/etrn/view/nml_amd_d.php?prec_no={prec_no}&block_no={area_code}&year=&month={month}&day=1&view="
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
 
