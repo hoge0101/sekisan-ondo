@@ -3,11 +3,15 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 import json
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 app = Flask(__name__)
 
 # 起動時に観測地点一覧を読み込んでおく
-with open("stations.json", "r", encoding="utf-8") as f:
+with open(os.path.join(BASE_DIR, "stations.json"), "r", encoding="utf-8") as f:
     STATIONS = json.load(f)
 
 
