@@ -267,7 +267,6 @@ button[type="submit"]:hover {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.95rem;
-    min-width: 420px;
 }
 
 .daily-table th,
@@ -275,6 +274,17 @@ button[type="submit"]:hover {
     padding: 8px 14px;
     text-align: right;
     white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+    .daily-table {
+        font-size: 0.8rem;
+    }
+
+    .daily-table th,
+    .daily-table td {
+        padding: 6px 6px;
+    }
 }
 
 .daily-table th:first-child,
