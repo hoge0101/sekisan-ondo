@@ -201,6 +201,40 @@ def get_cumulative_series_until_target(prec_no, area_code, start_date, target_te
     return series, reached
 
 
+def get_station_name(prec_no, area_code):
+    """「宗谷地方 稚内」のような表示用の地点名を返す"""
+    pref = STATIONS.get(prec_no)
+    if not pref:
+        return None
+    for station in pref["stations"]:
+        if station["block_no"] == area_code:
+            return f'{pref["name"]} {station["name"]}'
+    return pref["name"]
+
+
+def build_summary(series):
+    """結果画面に出すサマリー(期間・平均気温・実測/平年値の内訳)を組み立てる"""
+    if not series:
+        return None
+
+    used_temps = [
+        (s["actual"] if s["actual"] is not None else s["normal"])
+        for s in series
+    ]
+    used_temps = [t for t in used_temps if t is not None]
+
+    actual_days = sum(1 for s in series if s["is_actual"])
+
+    return {
+        "days": len(series),
+        "start_date": series[0]["date"],
+        "end_date": series[-1]["date"],
+        "avg_temp": round(sum(used_temps) / len(used_temps), 1) if used_temps else None,
+        "actual_days": actual_days,
+        "normal_days": len(series) - actual_days,
+    }
+
+
 def build_chart_svg(series, width=1000, height=500):
     """積算温度の推移を折れ線グラフのSVGとして描画する"""
     if not series:
@@ -232,8 +266,24 @@ def build_chart_svg(series, width=1000, height=500):
 
     points = [(x_pos(i), y_pos(s["cumulative"])) for i, s in enumerate(series)]
     polyline_points = " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
+    baseline = y_pos(0)
 
     svg_parts = [f'<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" class="chart">']
+
+    # 積算(=熱の蓄積)を、下は涼しい青・上は暖かい橙で表現する
+    svg_parts.append(
+        '<defs>'
+        '<linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">'
+        '<stop offset="0%" stop-color="#f0913a" stop-opacity="0.42" />'
+        '<stop offset="55%" stop-color="#4a90d9" stop-opacity="0.20" />'
+        '<stop offset="100%" stop-color="#4a90d9" stop-opacity="0.02" />'
+        '</linearGradient>'
+        '<linearGradient id="lineGrad" x1="0" y1="1" x2="1" y2="0">'
+        '<stop offset="0%" stop-color="#4a90d9" />'
+        '<stop offset="100%" stop-color="#ee7d2d" />'
+        '</linearGradient>'
+        '</defs>'
+    )
 
     grid_steps = 5
     for i in range(grid_steps + 1):
@@ -241,10 +291,10 @@ def build_chart_svg(series, width=1000, height=500):
         y = y_pos(value)
         svg_parts.append(
             f'<line x1="{padding_left}" y1="{y:.1f}" x2="{width - padding_right}" y2="{y:.1f}" '
-            f'stroke="#ddd" stroke-width="1" />'
+            f'stroke="#e8edf3" stroke-width="1" />'
         )
         svg_parts.append(
-            f'<text x="{padding_left - 10}" y="{y + 5:.1f}" font-size="16" text-anchor="end" fill="#333">{value:.0f}</text>'
+            f'<text x="{padding_left - 12}" y="{y + 5:.1f}" font-size="15" text-anchor="end" fill="#8a95a3">{value:.0f}</text>'
         )
 
     max_labels = 12
@@ -261,17 +311,41 @@ def build_chart_svg(series, width=1000, height=500):
         x = x_pos(i)
         label = f'{s["date"].month}/{s["date"].day}'
         svg_parts.append(
-            f'<text x="{x:.1f}" y="{height - padding_bottom + 25}" font-size="15" '
-            f'text-anchor="middle" fill="#333">{label}</text>'
+            f'<text x="{x:.1f}" y="{height - padding_bottom + 26}" font-size="14" '
+            f'text-anchor="middle" fill="#8a95a3">{label}</text>'
         )
 
-    svg_parts.append(f'<polyline points="{polyline_points}" fill="none" stroke="#2b8ac4" stroke-width="3" />')
-
-    for (x, y), s in zip(points, series):
-        fill = "#2b8ac4" if s["is_actual"] else "#ffffff"
+    # 実測値と平年値の境目に区切り線を入れる
+    last_actual = max((i for i, s in enumerate(series) if s["is_actual"]), default=None)
+    if last_actual is not None and last_actual < n - 1:
+        bx = (x_pos(last_actual) + x_pos(last_actual + 1)) / 2
         svg_parts.append(
-            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{fill}" stroke="#2b8ac4" stroke-width="2" />'
+            f'<line x1="{bx:.1f}" y1="{padding_top}" x2="{bx:.1f}" y2="{baseline:.1f}" '
+            f'stroke="#c3ccd8" stroke-width="1.5" stroke-dasharray="5 4" />'
         )
+        svg_parts.append(
+            f'<text x="{bx + 7:.1f}" y="{padding_top + 14}" font-size="13" fill="#a8b2c0">これ以降は平年値</text>'
+        )
+
+    area_path = (
+        f'M {points[0][0]:.1f},{baseline:.1f} '
+        + " ".join(f"L {x:.1f},{y:.1f}" for x, y in points)
+        + f' L {points[-1][0]:.1f},{baseline:.1f} Z'
+    )
+    svg_parts.append(f'<path d="{area_path}" fill="url(#areaGrad)" />')
+
+    svg_parts.append(
+        f'<polyline points="{polyline_points}" fill="none" stroke="url(#lineGrad)" '
+        f'stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" />'
+    )
+
+    # 点が多すぎるとつぶれて重くなるので、日数が少ないときだけ描く
+    if n <= 90:
+        for (x, y), s in zip(points, series):
+            fill = "#ee7d2d" if s["is_actual"] else "#ffffff"
+            svg_parts.append(
+                f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4.5" fill="{fill}" stroke="#ee7d2d" stroke-width="2" />'
+            )
 
     svg_parts.append("</svg>")
     return "".join(svg_parts)
@@ -283,6 +357,8 @@ def index():
     daily_series = None
     chart_svg = None
     reached_date = None
+    summary = None
+    station_name = None
     error = None
     form = request.form if request.method == "POST" else {}
 
@@ -317,12 +393,18 @@ def index():
                 result = daily_series[-1]["cumulative"] if daily_series else 0
                 chart_svg = build_chart_svg(daily_series)
 
+        if daily_series:
+            summary = build_summary(daily_series)
+            station_name = get_station_name(prec_no, area_code)
+
     return render_template(
         "index.html",
         result=result,
         daily_series=daily_series,
         chart_svg=chart_svg,
         reached_date=reached_date,
+        summary=summary,
+        station_name=station_name,
         stations=STATIONS,
         error=error,
         form=form,

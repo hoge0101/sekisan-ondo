@@ -8,9 +8,12 @@
 </head>
 <body>
     <div class="page">
-        <header class="page-header">
-            <h1>積算温度計算</h1>
-            <p class="subtitle">気象庁の観測データから、指定期間の積算温度を計算します</p>
+        <header class="hero">
+            <div class="hero-badge">🌡</div>
+            <div class="hero-text">
+                <h1>積算温度計算</h1>
+                <p class="subtitle">気象庁の観測データから、指定期間の積算温度を計算します</p>
+            </div>
         </header>
 
         {% if error %}
@@ -19,6 +22,8 @@
 
         <section class="card">
             <form method="POST" class="form-grid">
+                <h2 class="section-title">観測地点</h2>
+
                 <div class="field">
                     <label for="prefecture-select">都道府県・地方<span class="required-mark">※</span></label>
                     <select id="prefecture-select" name="prec_no" required>
@@ -36,24 +41,22 @@
                     </select>
                 </div>
 
+                <h2 class="section-title">計算期間</h2>
+
                 <div class="field">
                     <label for="start_date">開始日<span class="required-mark">※</span></label>
                     <input type="date" id="start_date" name="start_date" value="{{ form.get('start_date', '') }}" required>
                 </div>
 
                 <div class="field">
-                    <label>終了日または積算温度指定<span class="required-mark">※</span></label>
-                    <div class="end-mode-toggle">
-                        <label class="radio-label">
-                            <input type="radio" name="end_mode" value="date" id="end-mode-date"
-                                {% if form.get('end_mode', 'date') == 'date' %}checked{% endif %}>
-                            終了日で指定
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="end_mode" value="target" id="end-mode-target"
-                                {% if form.get('end_mode') == 'target' %}checked{% endif %}>
-                            積算温度で指定
-                        </label>
+                    <label>終了の指定方法<span class="required-mark">※</span></label>
+                    <div class="segmented">
+                        <input type="radio" name="end_mode" value="date" id="end-mode-date"
+                            {% if form.get('end_mode', 'date') == 'date' %}checked{% endif %}>
+                        <label for="end-mode-date">終了日</label>
+                        <input type="radio" name="end_mode" value="target" id="end-mode-target"
+                            {% if form.get('end_mode') == 'target' %}checked{% endif %}>
+                        <label for="end-mode-target">積算温度</label>
                     </div>
 
                     <div id="end-date-field" class="end-mode-input">
@@ -66,15 +69,17 @@
                     </div>
                 </div>
 
+                <h2 class="section-title">オプション</h2>
+
                 <div class="field">
-                    <label for="base_temp">基準温度(℃、任意)</label>
-                    <input type="number" id="base_temp" name="base_temp" step="0.1" value="{{ form.get('base_temp', '') }}">
+                    <label for="base_temp">基準温度(℃)</label>
+                    <input type="number" id="base_temp" name="base_temp" step="0.1" placeholder="0" value="{{ form.get('base_temp', '') }}">
                     <p class="field-hint">この温度を超えた分だけ積算します。未入力の場合は0℃(気温をそのまま積算)として計算します。</p>
                 </div>
 
                 <div class="field">
-                    <label for="correction">気温補正(℃、任意)</label>
-                    <input type="number" id="correction" name="correction" step="0.1" value="{{ form.get('correction', '') }}">
+                    <label for="correction">気温補正(℃)</label>
+                    <input type="number" id="correction" name="correction" step="0.1" placeholder="0" value="{{ form.get('correction', '') }}">
                     <p class="field-hint">観測地点と実際の場所の気温差を一律で補正します。例: 自宅が観測地点より1.5℃低い場合は -1.5 と入力。</p>
                 </div>
 
@@ -83,17 +88,46 @@
                 </div>
             </form>
 
-            <p class="info-note">※ 今日以降の気温は実測値がまだ無いため、観測地点の平年値(1991〜2020年の日別平均気温)を使って計算します。</p>
+            <p class="info-note">今日以降の気温は実測値がまだ無いため、観測地点の平年値(1991〜2020年の日別平均気温)を使って計算します。</p>
         </section>
 
         {% if result is not none %}
-            <section class="card result-summary">
-                <span class="result-label">積算温度</span>
-                <span class="result-value">{{ result }}<span class="result-unit">℃</span></span>
+            <section class="result-hero">
+                <span class="result-hero-label">積算温度</span>
+                <span class="result-hero-value">{{ "{:,.1f}".format(result) }}<span class="result-hero-unit">℃</span></span>
                 {% if reached_date %}
-                    <span class="result-date">({{ reached_date.isoformat() }} 到達)</span>
+                    <span class="result-hero-note">{{ reached_date.isoformat() }} に到達</span>
+                {% endif %}
+                {% if summary %}
+                    <span class="result-hero-meta">
+                        {% if station_name %}{{ station_name }}　/　{% endif %}
+                        {{ summary.start_date.isoformat() }} 〜 {{ summary.end_date.isoformat() }}
+                    </span>
                 {% endif %}
             </section>
+
+            {% if summary %}
+                <div class="stat-grid">
+                    <div class="stat">
+                        <span class="stat-label">期間</span>
+                        <span class="stat-value">{{ summary.days }}<span class="stat-unit">日</span></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">平均気温</span>
+                        <span class="stat-value">
+                            {% if summary.avg_temp is not none %}{{ summary.avg_temp }}<span class="stat-unit">℃</span>{% else %}---{% endif %}
+                        </span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">実測日数</span>
+                        <span class="stat-value">{{ summary.actual_days }}<span class="stat-unit">日</span></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">平年値日数</span>
+                        <span class="stat-value">{{ summary.normal_days }}<span class="stat-unit">日</span></span>
+                    </div>
+                </div>
+            {% endif %}
 
             <section class="card chart-card">
                 {{ chart_svg | safe }}
@@ -120,7 +154,7 @@
                                     <td>{{ row.date.isoformat() }}</td>
                                     <td>{{ row.actual if row.actual is not none else '---' }}</td>
                                     <td>{{ row.normal if row.normal is not none else '---' }}</td>
-                                    <td>{{ row.cumulative }}</td>
+                                    <td class="cell-cumulative">{{ row.cumulative }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
