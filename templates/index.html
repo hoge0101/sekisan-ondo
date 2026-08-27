@@ -126,10 +126,22 @@
             {% if anomaly_note %}
                 <p class="anomaly-note">
                     <strong>アノマリー補正を適用</strong>
-                    実測がまだ無い日(表の色付き行)の平年値に、直近{{ anomaly_years }}年の気温差を加算しました:
-                    {% for a in anomaly_note %}
-                        <span class="anomaly-chip">{{ a.month }}月 {{ "%+.2f"|format(a.anomaly) }}℃</span>
-                    {% endfor %}
+                    実測がまだ無い日(表の色付き行)の平年値に、以下を加算しました。<br>
+                    <span class="anomaly-row">
+                        <span class="anomaly-kind">長期</span>
+                        過去{{ anomaly_years }}年の同月の気温差:
+                        {% for a in anomaly_note.monthly %}
+                            <span class="anomaly-chip">{{ a.month }}月 {{ "%+.2f"|format(a.anomaly) }}℃</span>
+                        {% endfor %}
+                    </span>
+                    {% if anomaly_note.short_term %}
+                        <span class="anomaly-row">
+                            <span class="anomaly-kind">短期</span>
+                            直近{{ anomaly_note.short_term_window }}日の天候ぶん:
+                            <span class="anomaly-chip">{{ "%+.2f"|format(anomaly_note.short_term) }}℃</span>
+                            <span class="anomaly-fade">({{ anomaly_note.fade_days }}日先に向けて薄れ、以降はゼロ)</span>
+                        </span>
+                    {% endif %}
                 </p>
             {% endif %}
 

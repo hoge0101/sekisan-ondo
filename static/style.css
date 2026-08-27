@@ -331,6 +331,29 @@ button[type="submit"]:active {
     margin-right: 6px;
 }
 
+.anomaly-row {
+    display: block;
+    margin-top: 3px;
+}
+
+.anomaly-kind {
+    display: inline-block;
+    min-width: 2.6em;
+    margin-right: 6px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: var(--c-warm);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.anomaly-fade {
+    opacity: 0.75;
+    font-size: 0.94em;
+}
+
 .anomaly-chip {
     display: inline-block;
     margin: 0 3px;
