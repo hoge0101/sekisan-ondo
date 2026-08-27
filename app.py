@@ -223,9 +223,12 @@ def get_daily_temperatures(prec_no, area_code, start_date, end_date, use_anomaly
     result = {}
     d = start_date
     while d <= end_date:
+        actual = all_temps.get(d)
+        # 実測がある日は補正しない。アノマリーは直近の実測から求めた値なので、
+        # 実測自身と比べると「平年よりどれだけ高いか」の比較が歪んでしまう。
         result[d] = {
-            "actual": all_temps.get(d),
-            "normal": lookup_normal(prec_no, area_code, d, use_anomaly),
+            "actual": actual,
+            "normal": lookup_normal(prec_no, area_code, d, use_anomaly and actual is None),
         }
         d += timedelta(days=1)
 
@@ -290,7 +293,8 @@ def get_cumulative_series_until_target(prec_no, area_code, start_date, target_te
     d = start_date
     for _ in range(max_days):
         actual = get_monthly_data(prec_no, area_code, d.year, d.month).get(d) if d <= yesterday else None
-        normal = lookup_normal(prec_no, area_code, d, use_anomaly)
+        # 実測がある日は補正しない(get_daily_temperaturesと同じ理由)
+        normal = lookup_normal(prec_no, area_code, d, use_anomaly and actual is None)
         if actual is not None:
             actual += correction
         if normal is not None:
@@ -487,7 +491,6 @@ def index():
     summary = None
     station_name = None
     anomaly_note = None
-    use_anomaly = False
     error = None
     form = request.form if request.method == "POST" else {}
 
@@ -542,7 +545,6 @@ def index():
         summary=summary,
         station_name=station_name,
         anomaly_note=anomaly_note,
-        use_anomaly=use_anomaly,
         anomaly_years=ANOMALY_YEARS,
         stations=STATIONS,
         error=error,

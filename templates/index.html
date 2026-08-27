@@ -126,7 +126,7 @@
             {% if anomaly_note %}
                 <p class="anomaly-note">
                     <strong>アノマリー補正を適用</strong>
-                    平年値に加算した近年の気温差(直近{{ anomaly_years }}年):
+                    実測がまだ無い日(表の色付き行)の平年値に、直近{{ anomaly_years }}年の気温差を加算しました:
                     {% for a in anomaly_note %}
                         <span class="anomaly-chip">{{ a.month }}月 {{ "%+.2f"|format(a.anomaly) }}℃</span>
                     {% endfor %}
@@ -171,7 +171,7 @@
                             <tr>
                                 <th>日付</th>
                                 <th>実測(℃)</th>
-                                <th>{% if use_anomaly %}平年値+補正(℃){% else %}平年値(℃){% endif %}</th>
+                                <th>平年値(℃)</th>
                                 <th>積算(℃)</th>
                             </tr>
                         </thead>
