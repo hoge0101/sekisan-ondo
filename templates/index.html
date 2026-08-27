@@ -50,13 +50,17 @@
 
                 <div class="field">
                     <label>終了の指定方法<span class="required-mark">※</span></label>
-                    <div class="segmented">
-                        <input type="radio" name="end_mode" value="date" id="end-mode-date"
-                            {% if form.get('end_mode', 'date') == 'date' %}checked{% endif %}>
-                        <label for="end-mode-date">終了日</label>
-                        <input type="radio" name="end_mode" value="target" id="end-mode-target"
-                            {% if form.get('end_mode') == 'target' %}checked{% endif %}>
-                        <label for="end-mode-target">積算温度</label>
+                    <div class="end-mode-toggle">
+                        <label class="radio-label">
+                            <input type="radio" name="end_mode" value="date" id="end-mode-date"
+                                {% if form.get('end_mode', 'date') == 'date' %}checked{% endif %}>
+                            終了日で指定
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="end_mode" value="target" id="end-mode-target"
+                                {% if form.get('end_mode') == 'target' %}checked{% endif %}>
+                            積算温度で指定
+                        </label>
                     </div>
 
                     <div id="end-date-field" class="end-mode-input">
