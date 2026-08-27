@@ -87,6 +87,19 @@
                     <p class="field-hint">観測地点と実際の場所の気温差を一律で補正します。例: 自宅が観測地点より1.5℃低い場合は -1.5 と入力。</p>
                 </div>
 
+                <div class="field field-wide">
+                    <label class="check-label">
+                        <input type="checkbox" name="use_anomaly" value="1"
+                            {% if form.get('use_anomaly') %}checked{% endif %}>
+                        近年の気温傾向を反映する(アノマリー補正)
+                    </label>
+                    <p class="field-hint">
+                        平年値の基準期間(1991〜2020年)は中心が2005年頃のため、近年の気温より低めに出ます。
+                        直近{{ anomaly_years }}年の実測が平年値からどれだけ離れているかを求め、その差を平年値に加算します。
+                        未来日の予測精度は上がりますが、計算に少し時間がかかります。
+                    </p>
+                </div>
+
                 <div class="field submit-field">
                     <button type="submit">計算する</button>
                 </div>
@@ -109,6 +122,16 @@
                     </span>
                 {% endif %}
             </section>
+
+            {% if anomaly_note %}
+                <p class="anomaly-note">
+                    <strong>アノマリー補正を適用</strong>
+                    平年値に加算した近年の気温差(直近{{ anomaly_years }}年):
+                    {% for a in anomaly_note %}
+                        <span class="anomaly-chip">{{ a.month }}月 {{ "%+.2f"|format(a.anomaly) }}℃</span>
+                    {% endfor %}
+                </p>
+            {% endif %}
 
             {% if summary %}
                 <div class="stat-grid">
@@ -148,7 +171,7 @@
                             <tr>
                                 <th>日付</th>
                                 <th>実測(℃)</th>
-                                <th>平年値(℃)</th>
+                                <th>{% if use_anomaly %}平年値+補正(℃){% else %}平年値(℃){% endif %}</th>
                                 <th>積算(℃)</th>
                             </tr>
                         </thead>

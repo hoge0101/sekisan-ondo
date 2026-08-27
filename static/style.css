@@ -203,6 +203,30 @@ body {
     cursor: pointer;
 }
 
+.field.field-wide {
+    grid-column: 1 / -1;
+}
+
+.field .check-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--c-ink);
+    cursor: pointer;
+}
+
+.field .check-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    border: none;
+    accent-color: var(--c-cool-dark);
+    cursor: pointer;
+    transform: scale(1.15);
+}
+
 .submit-field {
     margin-top: 6px;
 }
@@ -288,6 +312,34 @@ button[type="submit"]:active {
     margin-top: 8px;
     font-size: 0.83rem;
     opacity: 0.85;
+}
+
+.anomaly-note {
+    margin: -6px 0 18px;
+    padding: 11px 15px;
+    background: #fdf5ec;
+    border: 1px solid #f3ddc4;
+    border-left: 3px solid var(--c-warm);
+    border-radius: 8px;
+    font-size: 0.84rem;
+    color: #8a5320;
+    line-height: 1.7;
+}
+
+.anomaly-note strong {
+    color: var(--c-warm);
+    margin-right: 6px;
+}
+
+.anomaly-chip {
+    display: inline-block;
+    margin: 0 3px;
+    padding: 1px 9px;
+    border-radius: 20px;
+    background: #fff;
+    border: 1px solid #f0cfa8;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 /* ---- サマリータイル ---- */

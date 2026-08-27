@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 from datetime import date, timedelta
 import json
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -15,7 +17,62 @@ with open(os.path.join(BASE_DIR, "stations.json"), "r", encoding="utf-8") as f:
     STATIONS = json.load(f)
 
 
+# 気象庁への問い合わせ結果のキャッシュ。
+# 同じ地点・月を何度も取りに行かずに済み、気象庁への負荷も抑えられる。
+_INCOMPLETE_MONTH_TTL = 1800  # 観測途中の月は30分で捨てる
+_CACHE_MAX_ENTRIES = 3000
+
+_monthly_cache = {}  # (prec_no, area_code, year, month) -> (期限, データ)
+_normal_cache = {}   # (prec_no, area_code, month) -> データ
+
+
+def _month_is_complete(year, month):
+    """その月の全日程がすでに過ぎているか(=データがもう増えないか)"""
+    if month == 12:
+        next_month_start = date(year + 1, 1, 1)
+    else:
+        next_month_start = date(year, month + 1, 1)
+    return next_month_start <= date.today()
+
+
 def get_monthly_data(prec_no, area_code, year, month):
+    """指定した年月の日別実測気温を返す(キャッシュ付き)"""
+    year, month = int(year), int(month)
+    key = (prec_no, area_code, year, month)
+
+    cached = _monthly_cache.get(key)
+    if cached is not None:
+        expires_at, data = cached
+        if expires_at is None or expires_at > time.time():
+            return data
+
+    data = fetch_monthly_data(prec_no, area_code, year, month)
+
+    if len(_monthly_cache) >= _CACHE_MAX_ENTRIES:
+        _monthly_cache.clear()
+    # 終わった月のデータはもう変わらないので期限なしで持っておく
+    expires_at = None if _month_is_complete(year, month) else time.time() + _INCOMPLETE_MONTH_TTL
+    _monthly_cache[key] = (expires_at, data)
+    return data
+
+
+def get_normal_daily_temps(prec_no, area_code, month):
+    """指定した月の日別平年値を返す(キャッシュ付き)。平年値は10年に一度しか更新されない"""
+    month = int(month)
+    key = (prec_no, area_code, month)
+
+    if key in _normal_cache:
+        return _normal_cache[key]
+
+    data = fetch_normal_daily_temps(prec_no, area_code, month)
+
+    if len(_normal_cache) >= _CACHE_MAX_ENTRIES:
+        _normal_cache.clear()
+    _normal_cache[key] = data
+    return data
+
+
+def fetch_monthly_data(prec_no, area_code, year, month):
     # 観測地点コードが5桁なら官署(daily_s1.php)、4桁ならアメダス(daily_a1.php)
     if len(area_code) == 5:
         url = f"https://www.data.jma.go.jp/stats/etrn/view/daily_s1.php?prec_no={prec_no}&block_no={area_code}&year={year}&month={month}&day=1&view="
@@ -48,7 +105,7 @@ def get_monthly_data(prec_no, area_code, year, month):
     return result
 
 
-def get_normal_daily_temps(prec_no, area_code, month):
+def fetch_normal_daily_temps(prec_no, area_code, month):
     """指定した観測地点の、指定した月の日別平年値(平均気温)を取得する。{日: 気温}のdictを返す"""
     # 観測地点コードが5桁なら官署(nml_sfc_d.php)、4桁ならアメダス(nml_amd_d.php)
     if len(area_code) == 5:
@@ -78,9 +135,75 @@ def get_normal_daily_temps(prec_no, area_code, month):
     return result
 
 
-def get_daily_temperatures(prec_no, area_code, start_date, end_date):
+ANOMALY_YEARS = 5  # アノマリーを求めるのに使う直近の年数
+_ANOMALY_WORKERS = 5  # 過去データをまとめて取りにいくときの同時接続数
+
+_anomaly_cache = {}  # (prec_no, area_code, month) -> アノマリー(℃) または None
+
+
+def _anomaly_target_years(month, years):
+    """アノマリー計算に使う、観測が終わった直近years年分の年を返す"""
+    this_year = date.today().year
+    target_years = []
+    year = this_year
+    while len(target_years) < years and year > this_year - years - 5:
+        if _month_is_complete(year, month):
+            target_years.append(year)
+        year -= 1
+    return target_years
+
+
+def get_monthly_anomaly(prec_no, area_code, month, years=ANOMALY_YEARS):
+    """直近years年の同月実測が、日別平年値からどれだけ離れているかの平均(℃)を返す。
+
+    平年値の基準期間(1991〜2020年)は中心が2005年頃のため、近年の気温より低めに出る。
+    この差(アノマリー)を平年値に足すことで、季節変化の形は30年分の滑らかな平年値カーブを
+    保ったまま、気温の水準だけを現在の気候に合わせられる。
+    データが足りない場合はNoneを返す。
+    """
+    month = int(month)
+    key = (prec_no, area_code, month)
+    if key in _anomaly_cache:
+        return _anomaly_cache[key]
+
+    normal = get_normal_daily_temps(prec_no, area_code, month)
+    if not normal:
+        _anomaly_cache[key] = None
+        return None
+
+    target_years = _anomaly_target_years(month, years)
+
+    # 5年分を順番に取ると待ち時間が積み上がるので、まとめて取りにいく
+    if len(target_years) > 1:
+        with ThreadPoolExecutor(max_workers=_ANOMALY_WORKERS) as pool:
+            list(pool.map(
+                lambda y: get_monthly_data(prec_no, area_code, y, month),
+                target_years,
+            ))
+
+    diffs = []
+    for year in target_years:
+        actual = get_monthly_data(prec_no, area_code, year, month)
+        paired = [
+            temp - normal[d.day]
+            for d, temp in actual.items()
+            if d.day in normal
+        ]
+        if paired:
+            diffs.append(sum(paired) / len(paired))
+
+    anomaly = round(sum(diffs) / len(diffs), 2) if diffs else None
+
+    if len(_anomaly_cache) >= _CACHE_MAX_ENTRIES:
+        _anomaly_cache.clear()
+    _anomaly_cache[key] = anomaly
+    return anomaly
+
+
+def get_daily_temperatures(prec_no, area_code, start_date, end_date, use_anomaly=False):
     """期間内の日ごとの実測気温と平年値を返す。
     {date: {"actual": 実測気温(昨日まで、それ以降はNone), "normal": 平年値(全ての日)}}
+    use_anomaly=True のとき、平年値には近年のアノマリーを加算した値を入れる。
     """
     today = date.today()
     yesterday = today - timedelta(days=1)
@@ -97,30 +220,37 @@ def get_daily_temperatures(prec_no, area_code, start_date, end_date):
             else:
                 current = date(current.year, current.month + 1, 1)
 
-    normal_daily_cache = {}
-
     result = {}
     d = start_date
     while d <= end_date:
-        actual = all_temps.get(d)
-
-        month = d.month
-        if month not in normal_daily_cache:
-            normal_daily_cache[month] = get_normal_daily_temps(prec_no, area_code, month)
-        normal = normal_daily_cache[month].get(d.day)
-
-        result[d] = {"actual": actual, "normal": normal}
+        result[d] = {
+            "actual": all_temps.get(d),
+            "normal": lookup_normal(prec_no, area_code, d, use_anomaly),
+        }
         d += timedelta(days=1)
 
     return result
 
 
-def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0, correction=0):
+def lookup_normal(prec_no, area_code, d, use_anomaly=False):
+    """その日の平年値を返す。use_anomaly=Trueなら近年のアノマリーを加算する"""
+    normal = get_normal_daily_temps(prec_no, area_code, d.month).get(d.day)
+    if normal is None or not use_anomaly:
+        return normal
+
+    anomaly = get_monthly_anomaly(prec_no, area_code, d.month)
+    if anomaly is None:
+        return normal
+    return round(normal + anomaly, 1)
+
+
+def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0, correction=0, use_anomaly=False):
     """日ごとの実測気温・平年値・積算温度の推移をリストで返す。
     積算には実測値(昨日まで)があればそれを、無ければ平年値を使う。
     correction: 観測地点の気温と実際の設置場所の気温のズレを補正する一律オフセット(℃)
+    use_anomaly: 平年値に近年のアノマリーを加算するか
     """
-    daily_temps = get_daily_temperatures(prec_no, area_code, start_date, end_date)
+    daily_temps = get_daily_temperatures(prec_no, area_code, start_date, end_date, use_anomaly)
 
     series = []
     total = 0
@@ -147,34 +277,20 @@ def get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp=0,
     return series
 
 
-def get_cumulative_series_until_target(prec_no, area_code, start_date, target_temp, base_temp=0, correction=0, max_days=1095):
+def get_cumulative_series_until_target(prec_no, area_code, start_date, target_temp, base_temp=0, correction=0, max_days=1095, use_anomaly=False):
     """開始日から積算温度がtarget_tempに達するまでの日ごとの推移を返す。
     (series, reached)のタプルを返す。max_days(既定3年)以内に達しなければreached=Falseになる。
     """
     today = date.today()
     yesterday = today - timedelta(days=1)
 
-    monthly_cache = {}
-    normal_daily_cache = {}
-
-    def get_actual(d):
-        key = (d.year, d.month)
-        if key not in monthly_cache:
-            monthly_cache[key] = get_monthly_data(prec_no, area_code, d.year, d.month)
-        return monthly_cache[key].get(d)
-
-    def get_normal(d):
-        if d.month not in normal_daily_cache:
-            normal_daily_cache[d.month] = get_normal_daily_temps(prec_no, area_code, d.month)
-        return normal_daily_cache[d.month].get(d.day)
-
     series = []
     total = 0
     reached = False
     d = start_date
     for _ in range(max_days):
-        actual = get_actual(d) if d <= yesterday else None
-        normal = get_normal(d)
+        actual = get_monthly_data(prec_no, area_code, d.year, d.month).get(d) if d <= yesterday else None
+        normal = lookup_normal(prec_no, area_code, d, use_anomaly)
         if actual is not None:
             actual += correction
         if normal is not None:
@@ -210,6 +326,17 @@ def get_station_name(prec_no, area_code):
         if station["block_no"] == area_code:
             return f'{pref["name"]} {station["name"]}'
     return pref["name"]
+
+
+def build_anomaly_note(prec_no, area_code, series):
+    """平年値を使った日について、適用したアノマリーを月ごとにまとめて表示用に返す"""
+    months = sorted({s["date"].month for s in series if not s["is_actual"]})
+    note = []
+    for month in months:
+        anomaly = get_monthly_anomaly(prec_no, area_code, month)
+        if anomaly is not None:
+            note.append({"month": month, "anomaly": anomaly})
+    return note
 
 
 def build_summary(series):
@@ -359,6 +486,8 @@ def index():
     reached_date = None
     summary = None
     station_name = None
+    anomaly_note = None
+    use_anomaly = False
     error = None
     form = request.form if request.method == "POST" else {}
 
@@ -369,6 +498,7 @@ def index():
         base_temp = float(request.form.get("base_temp") or 0)
         correction = float(request.form.get("correction") or 0)
         end_mode = request.form.get("end_mode", "date")
+        use_anomaly = request.form.get("use_anomaly") == "1"
 
         if end_mode == "target":
             target_temp = float(request.form.get("target_temp") or 0)
@@ -376,7 +506,8 @@ def index():
                 error = "目標積算温度は0より大きい値を指定してください"
             else:
                 daily_series, reached = get_cumulative_series_until_target(
-                    prec_no, area_code, start_date, target_temp, base_temp, correction
+                    prec_no, area_code, start_date, target_temp, base_temp, correction,
+                    use_anomaly=use_anomaly,
                 )
                 if not reached:
                     error = "指定期間(3年)内に目標積算温度へ到達しませんでした。条件を見直してください。"
@@ -389,13 +520,18 @@ def index():
             if start_date > end_date:
                 error = "開始日は終了日より前の日付を指定してください"
             else:
-                daily_series = get_cumulative_series(prec_no, area_code, start_date, end_date, base_temp, correction)
+                daily_series = get_cumulative_series(
+                    prec_no, area_code, start_date, end_date, base_temp, correction,
+                    use_anomaly=use_anomaly,
+                )
                 result = daily_series[-1]["cumulative"] if daily_series else 0
                 chart_svg = build_chart_svg(daily_series)
 
         if daily_series:
             summary = build_summary(daily_series)
             station_name = get_station_name(prec_no, area_code)
+            if use_anomaly:
+                anomaly_note = build_anomaly_note(prec_no, area_code, daily_series)
 
     return render_template(
         "index.html",
@@ -405,6 +541,9 @@ def index():
         reached_date=reached_date,
         summary=summary,
         station_name=station_name,
+        anomaly_note=anomaly_note,
+        use_anomaly=use_anomaly,
+        anomaly_years=ANOMALY_YEARS,
         stations=STATIONS,
         error=error,
         form=form,
