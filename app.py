@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, Response
 import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
@@ -8,6 +8,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 検索エンジンに正規URLを伝えるために使う(環境変数で差し替え可)
+SITE_URL = os.environ.get("SITE_URL", "https://sekisan-ondo.onrender.com/")
 
 
 app = Flask(__name__)
@@ -620,10 +623,20 @@ def index():
         station_name=station_name,
         anomaly_note=anomaly_note,
         anomaly_years=ANOMALY_YEARS,
+        site_url=SITE_URL,
         stations=STATIONS,
         error=error,
         form=form,
     )
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    """クローラーには全ページを開放する(検索で見つけてもらうため)。
+    気象庁への問い合わせはPOST時だけなので、クロールされても外部への負荷は増えない。
+    """
+    body = "User-agent: *\nAllow: /\n"
+    return Response(body, mimetype="text/plain")
 
 
 if __name__ == "__main__":
