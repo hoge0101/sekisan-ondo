@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, Response
+from flask import Flask, render_template, request, Response, send_from_directory
 import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
@@ -627,6 +627,101 @@ def index():
         stations=STATIONS,
         error=error,
         form=form,
+    )
+
+
+@app.route("/manifest.webmanifest")
+def manifest():
+    """ホーム画面に追加したときのアプリ情報(PWA)"""
+    body = json.dumps({
+        "name": "積算温度計算",
+        "short_name": "積算温度",
+        "description": "気象庁の観測データから、指定期間の積算温度を計算します。",
+        "lang": "ja",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#f4f6f9",
+        "theme_color": "#2b6ca8",
+        "icons": [
+            {
+                "src": "/static/icons/icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
+                "src": "/static/icons/icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
+                # Androidが丸などに切り抜く用
+                "src": "/static/icons/icon-maskable-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable",
+            },
+        ],
+    }, ensure_ascii=False)
+    return Response(body, mimetype="application/manifest+json")
+
+
+@app.route("/sw.js")
+def service_worker():
+    """PWAとしてインストールできるようにするためのService Worker。
+
+    静的ファイルだけをキャッシュし、HTMLと計算(POST)は常にネットワークへ通す。
+    HTMLをキャッシュすると古い計算結果が残ってしまうため。
+    ルート直下から配信しないとサイト全体を制御できないので、staticではなくルートに置く。
+    """
+    body = """
+const CACHE = "sekisan-v1";
+const ASSETS = [
+  "/static/style.css",
+  "/static/icons/icon-192.png",
+  "/static/icons/favicon-32.png",
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;  // 計算はPOSTなので触らない
+
+  const url = new URL(request.url);
+  if (url.origin !== location.origin) return;
+  if (!url.pathname.startsWith("/static/")) return;  // HTMLは常に最新を取りにいく
+
+  event.respondWith(
+    caches.match(request).then((hit) => hit || fetch(request).then((response) => {
+      const copy = response.clone();
+      caches.open(CACHE).then((cache) => cache.put(request, copy));
+      return response;
+    }))
+  );
+});
+""".strip()
+    return Response(body, mimetype="application/javascript")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(
+        os.path.join(app.static_folder, "icons"), "favicon.ico", mimetype="image/x-icon"
     )
 
 
