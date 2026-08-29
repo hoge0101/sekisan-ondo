@@ -531,8 +531,17 @@ def build_chart_svg(series, width=1000, height=500):
             f'<line x1="{bx:.1f}" y1="{padding_top}" x2="{bx:.1f}" y2="{baseline:.1f}" '
             f'stroke="#c3ccd8" stroke-width="1.5" stroke-dasharray="5 4" />'
         )
+        # 区切り線が右端に近いと右側に置いたラベルがはみ出すので、その場合は線の左に回す
+        label = "これ以降は平年値"
+        label_font = 13
+        label_width = len(label) * label_font  # 全角なので1文字≒フォントサイズ
+        if bx + 7 + label_width <= width - padding_right:
+            label_x, anchor = bx + 7, "start"
+        else:
+            label_x, anchor = bx - 7, "end"
         svg_parts.append(
-            f'<text x="{bx + 7:.1f}" y="{padding_top + 14}" font-size="13" fill="#a8b2c0">これ以降は平年値</text>'
+            f'<text x="{label_x:.1f}" y="{padding_top + 14}" font-size="{label_font}" '
+            f'text-anchor="{anchor}" fill="#a8b2c0">{label}</text>'
         )
 
     area_path = (
