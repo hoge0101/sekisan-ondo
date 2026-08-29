@@ -257,7 +257,8 @@ button[type="submit"]:active {
 }
 
 .info-note {
-    margin: 18px 0 0;
+    grid-column: 1 / -1;
+    margin: 0;
     padding: 11px 15px;
     background: #eef4fa;
     border-left: 3px solid var(--c-cool);
