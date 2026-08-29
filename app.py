@@ -730,8 +730,23 @@ def robots_txt():
     """クローラーには全ページを開放する(検索で見つけてもらうため)。
     気象庁への問い合わせはPOST時だけなので、クロールされても外部への負荷は増えない。
     """
-    body = "User-agent: *\nAllow: /\n"
+    body = f"User-agent: *\nAllow: /\n\nSitemap: {SITE_URL.rstrip('/')}/sitemap.xml\n"
     return Response(body, mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap():
+    """1ページだけのサイトなので、トップページのみを載せる"""
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url>\n"
+        f"    <loc>{SITE_URL}</loc>\n"
+        "    <changefreq>daily</changefreq>\n"
+        "  </url>\n"
+        "</urlset>\n"
+    )
+    return Response(body, mimetype="application/xml")
 
 
 if __name__ == "__main__":
