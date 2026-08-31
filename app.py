@@ -389,6 +389,74 @@ def get_cumulative_series_until_target(prec_no, area_code, start_date, target_te
     return series, reached
 
 
+# ページに表示するFAQ。構造化データ(JSON-LD)もここから組み立てるので、
+# 表示とマークアップの内容が食い違わない。
+FAQ = [
+    {
+        "q": "積算温度と有効積算温度の違いは何ですか？",
+        "a": "積算温度は日平均気温をそのまま足した値です。有効積算温度は、"
+             "生育がほとんど進まない温度(基準温度)を差し引いた分だけを足した値です。"
+             "このツールでは、基準温度を未入力または0にすると積算温度、"
+             "値を入れると有効積算温度になります。",
+    },
+    {
+        "q": "基準温度は何度に設定すればよいですか？",
+        "a": "作物や品種、生育段階によって異なります。都道府県の農業試験場や"
+             "普及指導センターが公開している栽培指針に記載があることが多いので、"
+             "そちらを確認してください。未入力の場合は0℃として、気温をそのまま積算します。",
+    },
+    {
+        "q": "未来の日付も計算できますか？",
+        "a": "できます。今日以降は実測値がまだ無いため、観測地点の平年値"
+             "(1991〜2020年の日別平均気温)を使って計算します。アノマリー補正を有効にすると、"
+             "近年の気温の傾向を反映して、より実態に近い推定になります。",
+    },
+    {
+        "q": "目標の積算温度から到達日を予測できますか？",
+        "a": "できます。終了の指定方法で「積算温度で指定」を選び、目標値を入力すると、"
+             "開始日からその値に達する日を計算します。最大3年先まで探索します。",
+    },
+    {
+        "q": "選んだ観測地点で気温が表示されないのはなぜですか？",
+        "a": "アメダスには降水量や風向風速だけを観測し、気温を観測していない地点があります。"
+             "その場合は実測値・平年値とも取得できません。近くの気象台などの観測地点を"
+             "選び直してください。",
+    },
+]
+
+
+def build_structured_data():
+    """検索エンジンにページの内容を伝える構造化データ(JSON-LD)を組み立てる"""
+    data = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebApplication",
+                "name": "積算温度計算",
+                "url": SITE_URL,
+                "applicationCategory": "UtilityApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "ja",
+                "description": "気象庁の観測データから、指定期間の積算温度を計算します。"
+                               "基準温度や気温補正の指定、目標の積算温度に達する日の予測にも対応。",
+                "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": item["q"],
+                        "acceptedAnswer": {"@type": "Answer", "text": item["a"]},
+                    }
+                    for item in FAQ
+                ],
+            },
+        ],
+    }
+    return json.dumps(data, ensure_ascii=False)
+
+
 def get_station_name(prec_no, area_code):
     """「宗谷地方 稚内」のような表示用の地点名を返す"""
     pref = STATIONS.get(prec_no)
@@ -633,6 +701,8 @@ def index():
         anomaly_note=anomaly_note,
         anomaly_years=ANOMALY_YEARS,
         site_url=SITE_URL,
+        faq=FAQ,
+        structured_data=build_structured_data(),
         stations=STATIONS,
         error=error,
         form=form,
