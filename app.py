@@ -657,7 +657,10 @@ def index():
         end_mode = request.form.get("end_mode", "date")
         use_anomaly = request.form.get("use_anomaly") == "1"
 
-        if end_mode == "target":
+        if not area_code:
+            # 画面側でも必須にしているが、素通りすると0℃という紛らわしい結果になるため
+            error = "観測地点を選択してください"
+        elif end_mode == "target":
             target_temp = float(request.form.get("target_temp") or 0)
             if target_temp <= 0:
                 error = "目標積算温度は0より大きい値を指定してください"

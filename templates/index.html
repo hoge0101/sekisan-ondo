@@ -41,11 +41,13 @@
         </header>
 
         {% if error %}
-            <p class="alert">{{ error }}</p>
+            <p class="alert" id="result">{{ error }}</p>
         {% endif %}
 
         <section class="card">
-            <form method="POST" class="form-grid">
+            <!-- 計算後に結果まで飛ばす。結果はページ下部にあり、
+                 先頭のままだと「押したのに何も起きない」ように見えるため -->
+            <form method="POST" action="#result" class="form-grid">
                 <h2 class="section-title">観測地点</h2>
 
                 <div class="field">
@@ -135,7 +137,7 @@
         </section>
 
         {% if result is not none %}
-            <section class="result-hero">
+            <section class="result-hero"{% if not error %} id="result"{% endif %}>
                 <span class="result-hero-label">積算温度</span>
                 <span class="result-hero-value">{{ "{:,.1f}".format(result) }}<span class="result-hero-unit">℃</span></span>
                 {% if reached_date %}
@@ -316,6 +318,13 @@
                 stationSelect.innerHTML = '<option value="">都道府県を先に選んでください</option>';
                 return;
             }
+
+            // 先頭に空の選択肢を置く。これが無いと一覧の1件目が既定で選ばれてしまい、
+            // 気温を観測していない地点だった場合、選び忘れると必ず計算に失敗する
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "選択してください";
+            stationSelect.appendChild(placeholder);
 
             const stations = stationsData[precNo].stations;
             stations.forEach(function(station) {

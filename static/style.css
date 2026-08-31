@@ -270,6 +270,11 @@ button[type="submit"]:active {
 
 /* ---- 結果ヒーロー ---- */
 
+/* 計算後のジャンプ先。画面上端にぴったり付かないよう少し余白を取る */
+#result {
+    scroll-margin-top: 16px;
+}
+
 .result-hero {
     background: var(--grad-temp);
     border-radius: 14px;
