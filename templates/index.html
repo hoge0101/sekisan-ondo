@@ -436,7 +436,10 @@
                 const px = p.x * scale;
                 const py = p.y * scale;
                 const flip = px + tip.offsetWidth + 18 > box.width;
-                tip.style.left = (flip ? px - tip.offsetWidth - 14 : px + 14) + "px";
+                let left = flip ? px - tip.offsetWidth - 14 : px + 14;
+                // 画面が狭いと左にはみ出すことがあるので、両端で止める
+                left = Math.max(0, Math.min(left, box.width - tip.offsetWidth));
+                tip.style.left = left + "px";
                 tip.style.top = Math.max(0, py - tip.offsetHeight / 2) + "px";
             }
 
@@ -446,8 +449,21 @@
                 guide.setAttribute("visibility", "hidden");
             }
 
-            wrap.addEventListener("pointermove", show);
-            wrap.addEventListener("pointerleave", hide);
+            // タッチでは指を押したまま動かさないと pointermove が出ないので、
+            // タップ(pointerdown)でも表示する
+            wrap.addEventListener("pointerdown", show);
+            wrap.addEventListener("pointermove", function (event) {
+                // 指の場合は押しながらなぞったときだけ追従させる
+                if (event.pointerType === "mouse" || event.buttons) show(event);
+            });
+
+            // マウスは離れたら消す。タッチは指を離しても残し、別の場所を触ったら消す
+            wrap.addEventListener("pointerleave", function (event) {
+                if (event.pointerType === "mouse") hide();
+            });
+            document.addEventListener("pointerdown", function (event) {
+                if (!wrap.contains(event.target)) hide();
+            });
         })();
 
         // ホーム画面に追加できるようにService Workerを登録する

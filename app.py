@@ -777,17 +777,10 @@ def service_worker():
     ルート直下から配信しないとサイト全体を制御できないので、staticではなくルートに置く。
     """
     body = """
-const CACHE = "sekisan-v1";
-const ASSETS = [
-  "/static/style.css",
-  "/static/icons/icon-192.png",
-  "/static/icons/favicon-32.png",
-];
+const CACHE = "sekisan-v2";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
@@ -798,6 +791,10 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// 静的ファイルはネットワークを優先し、取れたらキャッシュを更新する。
+// キャッシュ優先にすると、CSSやアイコンを直しても一度訪れた端末に
+// 新しいものが永久に届かなくなるため。
+// キャッシュは通信できないときの控えとしてだけ使う。
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;  // 計算はPOSTなので触らない
@@ -807,11 +804,13 @@ self.addEventListener("fetch", (event) => {
   if (!url.pathname.startsWith("/static/")) return;  // HTMLは常に最新を取りにいく
 
   event.respondWith(
-    caches.match(request).then((hit) => hit || fetch(request).then((response) => {
-      const copy = response.clone();
-      caches.open(CACHE).then((cache) => cache.put(request, copy));
-      return response;
-    }))
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE).then((cache) => cache.put(request, copy));
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
 """.strip()

@@ -428,6 +428,8 @@ button[type="submit"]:active {
 
 .chart-wrap {
     position: relative;
+    /* 指でなぞったときは縦スクロールだけ許し、横方向はグラフの操作に使う */
+    touch-action: pan-y;
 }
 
 .chart {
