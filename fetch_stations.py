@@ -1,3 +1,9 @@
+"""気象庁から全国の観測地点一覧を取得して stations.json に保存する。
+
+注意: このスクリプトは気温を観測していない地点も含めて書き出す。
+実行したあとは check_stations.py を続けて実行し、それらを取り除くこと。
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import re
