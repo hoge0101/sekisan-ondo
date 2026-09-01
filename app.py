@@ -512,9 +512,13 @@ def build_summary(series):
 
 
 def build_chart_svg(series, width=1000, height=500):
-    """積算温度の推移を折れ線グラフのSVGとして描画する"""
+    """積算温度の推移を折れ線グラフのSVGとして描画する。
+
+    (SVG文字列, 各点の座標リスト) を返す。座標はカーソルを重ねたときの
+    ポップアップ表示に使うので、描画と同じ計算結果をそのまま渡す。
+    """
     if not series:
-        return ""
+        return "", []
 
     padding_left = 70
     padding_right = 30
@@ -633,7 +637,19 @@ def build_chart_svg(series, width=1000, height=500):
             )
 
     svg_parts.append("</svg>")
-    return "".join(svg_parts)
+
+    chart_points = [
+        {
+            "x": round(x, 1),
+            "y": round(y, 1),
+            "date": s["date"].isoformat(),
+            "cumulative": s["cumulative"],
+            "temp": s["actual"] if s["actual"] is not None else s["normal"],
+            "is_actual": s["is_actual"],
+        }
+        for (x, y), s in zip(points, series)
+    ]
+    return "".join(svg_parts), chart_points
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -641,6 +657,7 @@ def index():
     result = None
     daily_series = None
     chart_svg = None
+    chart_points = []
     reached_date = None
     summary = None
     station_name = None
@@ -674,7 +691,7 @@ def index():
                 elif daily_series:
                     reached_date = daily_series[-1]["date"]
                 result = daily_series[-1]["cumulative"] if daily_series else 0
-                chart_svg = build_chart_svg(daily_series)
+                chart_svg, chart_points = build_chart_svg(daily_series)
         else:
             end_date = date.fromisoformat(request.form["end_date"])
             if start_date > end_date:
@@ -685,7 +702,7 @@ def index():
                     use_anomaly=use_anomaly,
                 )
                 result = daily_series[-1]["cumulative"] if daily_series else 0
-                chart_svg = build_chart_svg(daily_series)
+                chart_svg, chart_points = build_chart_svg(daily_series)
 
         if daily_series:
             summary = build_summary(daily_series)
@@ -698,6 +715,7 @@ def index():
         result=result,
         daily_series=daily_series,
         chart_svg=chart_svg,
+        chart_points=chart_points,
         reached_date=reached_date,
         summary=summary,
         station_name=station_name,

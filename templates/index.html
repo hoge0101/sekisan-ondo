@@ -197,7 +197,10 @@
             {% endif %}
 
             <section class="card chart-card">
-                {{ chart_svg | safe }}
+                <div class="chart-wrap" id="chart-wrap">
+                    {{ chart_svg | safe }}
+                    <div class="chart-tip" id="chart-tip" hidden></div>
+                </div>
                 <p class="chart-legend">
                     <span class="dot actual"></span>実測値
                     <span class="dot normal"></span>平年値(未来日・欠測時)
@@ -369,6 +372,83 @@
             radio.addEventListener("change", updateEndMode);
         });
         updateEndMode();
+
+        // グラフにカーソルを重ねたとき、その日の値をポップアップで出す
+        (function () {
+            const points = {{ chart_points | tojson }};
+            const wrap = document.getElementById("chart-wrap");
+            const tip = document.getElementById("chart-tip");
+            if (!points.length || !wrap || !tip) return;
+
+            const svg = wrap.querySelector("svg");
+            const viewBox = svg.viewBox.baseVal;
+
+            // カーソルに一番近い点を探すための下準備(点は日付順に並んでいる)
+            const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            marker.setAttribute("r", "7");
+            marker.setAttribute("class", "chart-marker");
+            marker.setAttribute("visibility", "hidden");
+            svg.appendChild(marker);
+
+            const guide = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            guide.setAttribute("class", "chart-guide");
+            guide.setAttribute("visibility", "hidden");
+            svg.appendChild(guide);
+
+            function nearest(viewX) {
+                let best = 0;
+                let bestGap = Infinity;
+                for (let i = 0; i < points.length; i++) {
+                    const gap = Math.abs(points[i].x - viewX);
+                    if (gap < bestGap) {
+                        bestGap = gap;
+                        best = i;
+                    }
+                }
+                return points[best];
+            }
+
+            function show(event) {
+                const box = svg.getBoundingClientRect();
+                // 画面上の座標を、SVGの座標系(viewBox)に換算する
+                const viewX = (event.clientX - box.left) / box.width * viewBox.width;
+                const p = nearest(viewX);
+
+                marker.setAttribute("cx", p.x);
+                marker.setAttribute("cy", p.y);
+                marker.setAttribute("visibility", "visible");
+                guide.setAttribute("x1", p.x);
+                guide.setAttribute("x2", p.x);
+                guide.setAttribute("y1", 30);
+                guide.setAttribute("y2", viewBox.height - 60);
+                guide.setAttribute("visibility", "visible");
+
+                const kind = p.is_actual ? "実測" : "平年値";
+                const temp = p.temp === null ? "---" : p.temp + "℃";
+                tip.innerHTML =
+                    '<span class="chart-tip-date">' + p.date + "</span>" +
+                    '<span class="chart-tip-cum">' + p.cumulative.toLocaleString() + "℃</span>" +
+                    '<span class="chart-tip-sub">' + kind + " " + temp + "</span>";
+                tip.hidden = false;
+
+                // 右端で見切れないよう、必要なら左側に出す
+                const scale = box.width / viewBox.width;
+                const px = p.x * scale;
+                const py = p.y * scale;
+                const flip = px + tip.offsetWidth + 18 > box.width;
+                tip.style.left = (flip ? px - tip.offsetWidth - 14 : px + 14) + "px";
+                tip.style.top = Math.max(0, py - tip.offsetHeight / 2) + "px";
+            }
+
+            function hide() {
+                tip.hidden = true;
+                marker.setAttribute("visibility", "hidden");
+                guide.setAttribute("visibility", "hidden");
+            }
+
+            wrap.addEventListener("pointermove", show);
+            wrap.addEventListener("pointerleave", hide);
+        })();
 
         // ホーム画面に追加できるようにService Workerを登録する
         if ("serviceWorker" in navigator) {

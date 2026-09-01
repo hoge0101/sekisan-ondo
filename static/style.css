@@ -426,10 +426,67 @@ button[type="submit"]:active {
     padding: 18px 18px 12px;
 }
 
+.chart-wrap {
+    position: relative;
+}
+
 .chart {
     display: block;
     width: 100%;
     height: auto;
+}
+
+/* カーソルを重ねた日を指すマーカーと縦線 */
+.chart-marker {
+    fill: #fff;
+    stroke: var(--c-warm);
+    stroke-width: 3;
+    pointer-events: none;
+}
+
+.chart-guide {
+    stroke: var(--c-warm);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 3;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.chart-tip {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(31, 43, 58, 0.92);
+    color: #fff;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(31, 43, 58, 0.25);
+}
+
+/* display:flex がブラウザ標準の [hidden]{display:none} を上書きしてしまうので、
+   隠す指定を明示的に書き足す */
+.chart-tip[hidden] {
+    display: none;
+}
+
+.chart-tip-date {
+    opacity: 0.8;
+    font-size: 0.75rem;
+}
+
+.chart-tip-cum {
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.chart-tip-sub {
+    opacity: 0.8;
+    font-size: 0.75rem;
 }
 
 .chart-legend {
