@@ -556,12 +556,20 @@ button[type="submit"]:active {
     text-align: left;
 }
 
+/* 過去の観測は参考情報なので1行に収め、あふれる分は省略する(全文は title で読める)。
+   未来の予報は行動の判断に使うので、折り返して全文を見せる。 */
 .daily-table .col-weather span {
     display: block;
     max-width: 7.5em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.daily-table .col-weather.is-forecast span {
+    overflow: visible;
+    white-space: normal;
+    line-height: 1.35;
 }
 
 @media (max-width: 900px) {

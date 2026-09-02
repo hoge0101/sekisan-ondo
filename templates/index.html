@@ -225,7 +225,9 @@
                             {% for row in daily_series %}
                                 <tr class="{% if not row.is_actual %}row-normal{% endif %}">
                                     <td>{{ row.date.isoformat() }}</td>
-                                    <td class="col-weather" title="{{ row.weather or '' }}">
+                                    {# 予報は行動の判断に使うので全文を出す。過去の観測は参考なので1行に収める #}
+                                    <td class="col-weather{% if row.is_forecast %} is-forecast{% endif %}"
+                                        title="{{ row.weather or '' }}">
                                         <span>{{ row.weather or '---' }}</span>
                                     </td>
                                     {# 過去は実測の降水量(mm)、未来は予報の降水確率(%)。単位で区別が付く #}

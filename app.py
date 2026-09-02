@@ -640,11 +640,13 @@ def attach_weather(prec_no, area_code, series):
             row["weather"] = record.get("weather")
             row["precip"] = record.get("precip")
             row["rain_chance"] = None
+            row["is_forecast"] = False
         else:
             predicted = forecast.get(d) or {}
             row["weather"] = predicted.get("weather")
             row["precip"] = None
             row["rain_chance"] = predicted.get("rain_chance")
+            row["is_forecast"] = True
 
 
 def build_anomaly_note(prec_no, area_code, series):
