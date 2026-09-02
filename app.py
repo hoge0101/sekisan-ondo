@@ -38,8 +38,8 @@ def _month_is_complete(year, month):
     return next_month_start <= date.today()
 
 
-def get_monthly_data(prec_no, area_code, year, month):
-    """指定した年月の日別実測気温を返す(キャッシュ付き)"""
+def get_monthly_records(prec_no, area_code, year, month):
+    """指定した年月の日ごとの観測値(気温・降水量・天気)を返す(キャッシュ付き)"""
     year, month = int(year), int(month)
     key = (prec_no, area_code, year, month)
 
@@ -49,7 +49,7 @@ def get_monthly_data(prec_no, area_code, year, month):
         if expires_at is None or expires_at > time.time():
             return data
 
-    data = fetch_monthly_data(prec_no, area_code, year, month)
+    data = fetch_monthly_records(prec_no, area_code, year, month)
 
     if len(_monthly_cache) >= _CACHE_MAX_ENTRIES:
         _monthly_cache.clear()
@@ -57,6 +57,15 @@ def get_monthly_data(prec_no, area_code, year, month):
     expires_at = None if _month_is_complete(year, month) else time.time() + _INCOMPLETE_MONTH_TTL
     _monthly_cache[key] = (expires_at, data)
     return data
+
+
+def get_monthly_data(prec_no, area_code, year, month):
+    """日別の平均気温だけを {date: 気温} で返す。取得は get_monthly_records と共通"""
+    return {
+        d: rec["temp"]
+        for d, rec in get_monthly_records(prec_no, area_code, year, month).items()
+        if rec["temp"] is not None
+    }
 
 
 def get_normal_daily_temps(prec_no, area_code, month):
@@ -75,14 +84,39 @@ def get_normal_daily_temps(prec_no, area_code, month):
     return data
 
 
-def fetch_monthly_data(prec_no, area_code, year, month):
+def _to_float(text):
+    """数値に変換する。欠測(「///」「×」)や空欄は None にする"""
+    try:
+        return float(text)
+    except (ValueError, TypeError):
+        return None
+
+
+def _to_precip(text):
+    """降水量を数値にする。
+
+    気象庁の記号では「--」は現象なし(=雨が降らなかった)で、欠測ではない。
+    そのまま None にすると観測できなかった日と区別が付かなくなるので、0.0 として扱う。
+    「0.0」は雨は降ったが0.5mmに満たなかった日を指す。
+    """
+    if text is not None and text.strip() == "--":
+        return 0.0
+    return _to_float(text)
+
+
+def fetch_monthly_records(prec_no, area_code, year, month):
+    """指定した年月の日ごとの観測値を返す。
+
+    {date: {"temp": 平均気温, "precip": 降水量合計, "weather": 天気概況}}
+    天気概況は官署だけが観測しているので、アメダスでは None になる。
+    """
     # 観測地点コードが5桁なら官署(daily_s1.php)、4桁ならアメダス(daily_a1.php)
     if len(area_code) == 5:
         url = f"https://www.data.jma.go.jp/stats/etrn/view/daily_s1.php?prec_no={prec_no}&block_no={area_code}&year={year}&month={month}&day=1&view="
-        temp_col = 6
+        temp_col, precip_col, weather_col = 6, 3, 19
     else:
         url = f"https://www.data.jma.go.jp/stats/etrn/view/daily_a1.php?prec_no={prec_no}&block_no={area_code}&year={year}&month={month}&day=1&view="
-        temp_col = 4
+        temp_col, precip_col, weather_col = 4, 1, None
 
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
@@ -97,14 +131,23 @@ def fetch_monthly_data(prec_no, area_code, year, month):
     for row in rows[3:]:
         cells = row.find_all(["td", "th"])
         cell_texts = [cell.get_text(strip=True) for cell in cells]
-        if len(cell_texts) > temp_col:
-            try:
-                day = int(cell_texts[0])
-                temp = float(cell_texts[temp_col])
-                d = date(int(year), int(month), day)
-                result[d] = temp
-            except ValueError:
-                pass
+        if len(cell_texts) <= temp_col:
+            continue
+        try:
+            day = int(cell_texts[0])
+            d = date(int(year), int(month), day)
+        except ValueError:
+            continue  # 見出し行など
+
+        weather = None
+        if weather_col is not None and len(cell_texts) > weather_col:
+            weather = cell_texts[weather_col].strip() or None
+
+        result[d] = {
+            "temp": _to_float(cell_texts[temp_col]),
+            "precip": _to_precip(cell_texts[precip_col]),
+            "weather": weather,
+        }
     return result
 
 
@@ -135,6 +178,104 @@ def fetch_normal_daily_temps(prec_no, area_code, month):
                 result[day] = temp
             except ValueError:
                 pass
+    return result
+
+
+# 都道府県・地方コード -> 気象庁の府県予報区コード
+with open(os.path.join(BASE_DIR, "forecast_areas.json"), "r", encoding="utf-8") as f:
+    FORECAST_AREAS = json.load(f)
+
+_FORECAST_TTL = 1800  # 予報は3時間ごとに更新されるので30分で取り直す
+_forecast_cache = {}  # prec_no -> (期限, {date: {...}})
+
+# 天気コードの上1桁が基本の天気を表す。短縮表記を作れなかったときの控え
+_WEATHER_BASE = {"1": "晴", "2": "くもり", "3": "雨", "4": "雪"}
+
+
+def shorten_weather(text):
+    """予報の文章を、表の1列に収まる短さにする。
+
+    「くもり　夜　雨　所により　夜遅く　雷　を伴う」→「くもり夜雨」
+    「所により」以降はその地域内の細かい違いの説明なので落とす。
+    """
+    if not text:
+        return None
+    normalized = text.replace("　", "")
+    for marker in ("所により", "を伴う", "はじめ", "のち一時"):
+        index = normalized.find(marker)
+        if index > 0:
+            normalized = normalized[:index]
+    return normalized.strip() or None
+
+
+def build_weather_labels(section):
+    """3日予報の「コードと文章の対」から、コード→短縮表記の対応を作る"""
+    labels = {}
+    for series in section.get("timeSeries", []):
+        for area in series.get("areas", []):
+            codes = area.get("weatherCodes") or []
+            texts = area.get("weathers") or []
+            for code, text in zip(codes, texts):
+                label = shorten_weather(text)
+                if label and code not in labels:
+                    labels[code] = label
+    return labels
+
+
+def get_forecast(prec_no):
+    """その地方の週間予報を {date: {"weather": 天気, "rain_chance": 降水確率}} で返す。
+
+    気象庁の予報は府県予報区の単位なので、観測地点そのものではなく
+    その地点が属する地域の予報になる。降水量(mm)の予報は提供されていないため、
+    代わりに降水確率(%)を持つ。
+    """
+    area = FORECAST_AREAS.get(prec_no)
+    if not area:
+        return {}
+
+    cached = _forecast_cache.get(prec_no)
+    if cached and cached[0] > time.time():
+        return cached[1]
+
+    try:
+        data = requests.get(
+            f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area}.json", timeout=15
+        ).json()
+    except Exception:
+        return {}
+
+    # 天気コードの意味は、同じ応答に入っている3日予報の文章から読み取る。
+    # 気象庁が公開していた対応表(telops.json)は現在取得できないため。
+    labels = build_weather_labels(data[0])
+
+    def label_for(code):
+        return labels.get(code) or _WEATHER_BASE.get(code[:1])
+
+    result = {}
+
+    # 後ろのセクションほど広い期間(週間予報)を持つので、先に週間、あとから
+    # 直近3日で上書きして、近い日ほど詳しい情報が残るようにする
+    for section in reversed(data):
+        for series in section.get("timeSeries", []):
+            areas = series.get("areas") or []
+            if not areas:
+                continue
+            first = areas[0]  # 最初のエリアがその予報区の代表
+            for i, stamp in enumerate(series["timeDefines"]):
+                d = date.fromisoformat(stamp[:10])
+                entry = result.setdefault(d, {"weather": None, "rain_chance": None})
+
+                codes = first.get("weatherCodes")
+                if codes and i < len(codes):
+                    entry["weather"] = label_for(codes[i]) or entry["weather"]
+
+                pops = first.get("pops")
+                if pops and i < len(pops) and pops[i] != "":
+                    # 3日予報は6時間ごとに複数あるので、その日の最大を採る
+                    pop = int(pops[i])
+                    entry["rain_chance"] = pop if entry["rain_chance"] is None else max(entry["rain_chance"], pop)
+
+    _forecast_cache[prec_no] = (time.time() + _FORECAST_TTL, result)
     return result
 
 
@@ -417,6 +558,13 @@ FAQ = [
              "開始日からその値に達する日を計算します。最大3年先まで探索します。",
     },
     {
+        "q": "天気や降水量はどこまで表示されますか？",
+        "a": "過去の日は観測値、今日から7日先までは気象庁の予報を表示し、それ以降は空欄です。"
+             "降水量(mm)の予報は提供されていないため、未来の日は代わりに降水確率(%)を"
+             "別の列に出しています。天気を観測しているのは気象台などの規模の大きい観測所だけなので、"
+             "アメダスでは過去の天気は空欄になります。いずれも積算温度の計算には使っていません。",
+    },
+    {
         "q": "近くのアメダスが一覧に出てこないのはなぜですか？",
         "a": "アメダスには降水量や風向風速だけを観測し、気温を測っていない地点が多くあります。"
              "選んでも計算できないため、そうした地点はあらかじめ一覧から除いています。"
@@ -466,6 +614,37 @@ def get_station_name(prec_no, area_code):
         if station["block_no"] == area_code:
             return f'{pref["name"]} {station["name"]}'
     return pref["name"]
+
+
+def attach_weather(prec_no, area_code, series):
+    """表示用に、日ごとの天気・降水量・降水確率を series に足す。
+
+    昨日までは観測値(気温取得時のキャッシュを使うので追加の通信はしない)、
+    今日以降は気象庁の予報を使う。予報は7日先までなので、それ以降は空になる。
+    降水量(mm)の予報は提供されていないため、未来日は降水確率(%)を入れる。
+    """
+    if not series:
+        return
+
+    yesterday = date.today() - timedelta(days=1)
+    forecast = get_forecast(prec_no)
+    records = {}
+
+    for row in series:
+        d = row["date"]
+        if d <= yesterday:
+            key = (d.year, d.month)
+            if key not in records:
+                records[key] = get_monthly_records(prec_no, area_code, d.year, d.month)
+            record = records[key].get(d) or {}
+            row["weather"] = record.get("weather")
+            row["precip"] = record.get("precip")
+            row["rain_chance"] = None
+        else:
+            predicted = forecast.get(d) or {}
+            row["weather"] = predicted.get("weather")
+            row["precip"] = None
+            row["rain_chance"] = predicted.get("rain_chance")
 
 
 def build_anomaly_note(prec_no, area_code, series):
@@ -705,6 +884,7 @@ def index():
                 chart_svg, chart_points = build_chart_svg(daily_series)
 
         if daily_series:
+            attach_weather(prec_no, area_code, daily_series)
             summary = build_summary(daily_series)
             station_name = get_station_name(prec_no, area_code)
             if use_anomaly:

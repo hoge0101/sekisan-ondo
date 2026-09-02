@@ -213,15 +213,31 @@
                         <thead>
                             <tr>
                                 <th>日付</th>
-                                <th>実測(℃)</th>
-                                <th>平年値(℃)</th>
-                                <th>積算(℃)</th>
+                                <th class="col-weather">天気</th>
+                                <th>降水</th>
+                                {# 単位は2行目に置く。横一列だと列幅が単位ぶん広がるため #}
+                                <th>実測<span class="unit">℃</span></th>
+                                <th>平年値<span class="unit">℃</span></th>
+                                <th>積算<span class="unit">℃</span></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for row in daily_series %}
                                 <tr class="{% if not row.is_actual %}row-normal{% endif %}">
                                     <td>{{ row.date.isoformat() }}</td>
+                                    <td class="col-weather" title="{{ row.weather or '' }}">
+                                        <span>{{ row.weather or '---' }}</span>
+                                    </td>
+                                    {# 過去は実測の降水量(mm)、未来は予報の降水確率(%)。単位で区別が付く #}
+                                    <td>
+                                        {%- if row.precip is not none -%}
+                                            {{ row.precip }}mm
+                                        {%- elif row['rain_chance'] is not none -%}
+                                            {{ row['rain_chance'] }}%
+                                        {%- else -%}
+                                            ---
+                                        {%- endif -%}
+                                    </td>
                                     <td>{{ row.actual if row.actual is not none else '---' }}</td>
                                     <td>{{ row.normal if row.normal is not none else '---' }}</td>
                                     <td class="cell-cumulative">{{ row.cumulative }}</td>
@@ -230,6 +246,7 @@
                         </tbody>
                     </table>
                 </div>
+                <p class="table-hint">表は横にスクロールできます。日付の列は固定されます。</p>
             </section>
         {% endif %}
 
@@ -274,6 +291,20 @@
                 どれだけ離れていたかを求め、その差を上乗せします。あわせて直近3日の天候の傾向を、
                 7日先に向けて薄れるように加えます。長い期間を予測するほど、この補正の有無で
                 到達日の見積もりが変わります。
+            </p>
+
+            <h2>天気と降水量について</h2>
+            <p>
+                参考として、日ごとの天気と降水量も表に出しています。過去の日は観測値、
+                今日から7日先までは気象庁の予報で、それ以降は空欄になります。
+                積算温度の計算には使っていません。
+            </p>
+            <p>
+                降水量(mm)の予報は気象庁から提供されていないため、未来の日は代わりに
+                <strong>降水確率(%)</strong>を別の列に出しています。また予報は市町村ではなく
+                地域(府県予報区)の単位なので、観測地点そのものではなく、その地点が属する
+                地域の予報になります。天気の観測は気象台などの規模の大きい観測所だけが
+                行っているため、アメダスでは過去の天気は空欄です。
             </p>
 
             <h2>使い方</h2>

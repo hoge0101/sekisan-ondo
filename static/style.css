@@ -549,6 +549,27 @@ button[type="submit"]:active {
     text-align: left;
 }
 
+/* 天気は文章なので左寄せ。長い予報文で列が広がらないよう上限を設け、
+   あふれる分は省略する(全文は title 属性で読める)。
+   セルに直接 max-width を掛けても効かないので、中の span に掛ける。 */
+.daily-table .col-weather {
+    text-align: left;
+}
+
+.daily-table .col-weather span {
+    display: block;
+    max-width: 7.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .daily-table .col-weather span {
+        max-width: 5.5em;
+    }
+}
+
 .daily-table thead th {
     background: var(--c-cool-dark);
     color: #fff;
@@ -557,6 +578,15 @@ button[type="submit"]:active {
     font-weight: 600;
     font-size: 0.85rem;
     letter-spacing: 0.02em;
+    line-height: 1.3;
+}
+
+/* 単位を2行目に落とす。横に並べると単位の幅ぶん列が広がってしまう */
+.daily-table thead .unit {
+    display: block;
+    font-weight: 400;
+    font-size: 0.85em;
+    opacity: 0.75;
 }
 
 .daily-table tbody tr {
@@ -580,6 +610,51 @@ button[type="submit"]:active {
     color: var(--c-warm);
 }
 
+/* 横に長い表を狭い画面で見るとき、日付だけ左に貼り付けておく。
+   そうしないと右にスクロールした先で、どの日の行を見ているのか分からなくなる。
+   貼り付けた列は下の行が透けるので、行ごとの背景色を明示的に持たせる。 */
+@media (max-width: 900px) {
+    .daily-table th:first-child,
+    .daily-table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: var(--c-card);
+        box-shadow: 2px 0 5px rgba(31, 43, 58, 0.07);
+    }
+
+    .daily-table thead th:first-child {
+        z-index: 2;
+        background: var(--c-cool-dark);
+    }
+
+    .daily-table tbody tr:nth-child(even) td:first-child {
+        background: #f7fafd;
+    }
+
+    .daily-table tbody tr.row-normal td:first-child {
+        background: #fdf5ec;
+    }
+
+    .daily-table tbody tr.row-normal:nth-child(even) td:first-child {
+        background: #fbeee0;
+    }
+}
+
+.table-hint {
+    display: none;
+    margin: 0;
+    padding: 8px 14px 12px;
+    font-size: 0.76rem;
+    color: var(--c-muted);
+}
+
+@media (max-width: 900px) {
+    .table-hint {
+        display: block;
+    }
+}
+
 @media (max-width: 480px) {
     .daily-table {
         font-size: 0.8rem;
@@ -587,7 +662,13 @@ button[type="submit"]:active {
 
     .daily-table th,
     .daily-table td {
-        padding: 7px 6px;
+        padding: 7px 3px;
+    }
+
+    /* 詰めたぶん列同士が近づくので、区切りの罫線で読み違いを防ぐ */
+    .daily-table th + th,
+    .daily-table td + td {
+        border-left: 1px solid #eef2f6;
     }
 
     .result-hero-value {
