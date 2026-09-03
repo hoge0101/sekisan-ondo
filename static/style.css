@@ -556,8 +556,11 @@ button[type="submit"]:active {
     overflow-x: auto;
 }
 
+/* width:100% だけだと、収まらないときに列を押し潰して中身が切れてしまう。
+   最低でも内容が収まる幅を確保し、足りなければ table-scroll で横に送る。 */
 .daily-table {
     width: 100%;
+    min-width: max-content;
     border-collapse: collapse;
     font-size: 0.93rem;
 }
