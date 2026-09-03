@@ -66,10 +66,35 @@ body {
     color: var(--c-cool-deep);
 }
 
+.hero-text h1 .hero-variant {
+    margin-left: 6px;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: var(--c-muted);
+    white-space: nowrap;
+}
+
 .subtitle {
     margin: 2px 0 0;
     color: var(--c-muted);
     font-size: 0.9rem;
+}
+
+/* 姉妹アプリへの案内。ヘッダーのすぐ下、フォームの手前に置く */
+.sister-note {
+    margin: 0 0 18px;
+    padding: 11px 15px;
+    background: #eef4fa;
+    border-left: 3px solid var(--c-cool);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--c-cool-deep);
+    line-height: 1.6;
+}
+
+.sister-note a {
+    color: var(--c-cool-dark);
+    font-weight: 700;
 }
 
 .alert {

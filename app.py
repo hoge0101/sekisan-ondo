@@ -580,12 +580,12 @@ def build_structured_data():
         "@graph": [
             {
                 "@type": "WebApplication",
-                "name": "積算温度計算",
+                "name": "確かな積算温度計算(実測データ版)",
                 "url": SITE_URL,
                 "applicationCategory": "UtilityApplication",
                 "operatingSystem": "Web",
                 "inLanguage": "ja",
-                "description": "気象庁の観測データから、指定期間の積算温度を計算します。"
+                "description": "気象庁の観測地点データから、指定期間の積算温度を計算します。"
                                "基準温度や気温補正の指定、目標の積算温度に達する日の予測にも対応。",
                 "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
             },
@@ -916,9 +916,9 @@ def index():
 def manifest():
     """ホーム画面に追加したときのアプリ情報(PWA)"""
     body = json.dumps({
-        "name": "積算温度計算",
-        "short_name": "積算温度",
-        "description": "気象庁の観測データから、指定期間の積算温度を計算します。",
+        "name": "確かな積算温度計算(実測データ版)",
+        "short_name": "積算温度(実測)",
+        "description": "気象庁の観測地点データから、指定期間の積算温度を計算します。",
         "lang": "ja",
         "start_url": "/",
         "scope": "/",

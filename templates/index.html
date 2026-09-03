@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>積算温度計算 | 気象庁データから日ごとの積算温度を計算</title>
-    <meta name="description" content="気象庁の観測データから積算温度を計算します。全国の観測地点と期間を選ぶだけで、日ごとの気温と積算温度をグラフと表で確認できます。基準温度・気温補正の指定や、目標の積算温度に達する日の予測にも対応。">
+    <title>確かな積算温度計算(実測データ版)</title>
+    <meta name="description" content="気象庁の観測地点データから、指定期間の積算温度を計算します。日ごとの気温と積算温度をグラフと表で確認でき、基準温度・気温補正の指定や、目標の積算温度に達する日の予測にも対応。">
     <link rel="canonical" href="{{ site_url }}">
 
     <!-- Google Search Console の所有権確認用 -->
     <meta name="google-site-verification" content="fqwFOhObCh_lr9mYexXojeZgyN_vuoNwhsMla4VIYik">
 
     <meta property="og:type" content="website">
-    <meta property="og:title" content="積算温度計算">
-    <meta property="og:description" content="気象庁の観測データから、指定期間の積算温度を日ごとのグラフと表で計算します。">
+    <meta property="og:title" content="確かな積算温度計算(実測データ版)">
+    <meta property="og:description" content="気象庁の観測地点データから、指定期間の積算温度を計算します">
     <meta property="og:url" content="{{ site_url }}">
     <meta name="twitter:card" content="summary">
 
@@ -24,7 +24,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="積算温度">
+    <meta name="apple-mobile-web-app-title" content="積算温度(実測)">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
@@ -35,10 +35,17 @@
         <header class="hero">
             <div class="hero-badge">🌡</div>
             <div class="hero-text">
-                <h1>積算温度計算</h1>
-                <p class="subtitle">気象庁の観測データから、指定期間の積算温度を計算します</p>
+                <h1>確かな積算温度計算<span class="hero-variant">(実測データ版)</span></h1>
+                <p class="subtitle">気象庁の観測地点データから、指定期間の積算温度を計算します</p>
             </div>
         </header>
+
+        {# 姉妹アプリへの案内。相手側と同じくヘッダーのすぐ下に置く #}
+        <p class="sister-note">
+            近くに観測地点がない場合や、地図から自由に場所を選びたい場合は
+            <a href="https://sekisan-ondo-openmeteo.onrender.com">「どこでも積算温度計算(地図から選ぶ版)」</a>
+            もどうぞ
+        </p>
 
         {% if error %}
             <p class="alert" id="result">{{ error }}</p>
