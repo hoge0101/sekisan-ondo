@@ -54,7 +54,7 @@
         <section class="card">
             <!-- 計算後に結果まで飛ばす。結果はページ下部にあり、
                  先頭のままだと「押したのに何も起きない」ように見えるため -->
-            <form method="POST" action="#result" class="form-grid">
+            <form method="POST" action="#result" class="form-grid" id="calc-form">
                 <h2 class="section-title">観測地点</h2>
 
                 <div class="field">
@@ -138,7 +138,15 @@
                 </div>
 
                 <div class="field submit-field">
-                    <button type="submit">計算する</button>
+                    <button type="submit" id="calc-button">
+                        <span class="calc-spinner" aria-hidden="true"></span>
+                        <span class="calc-button-label">計算する</span>
+                    </button>
+                    <!-- 気象庁への問い合わせに数秒かかるので、押したあと反応がないように
+                         見えないよう、待っていることを伝える -->
+                    <p class="calc-waiting" id="calc-waiting" hidden role="status">
+                        気象庁のデータを取得しています。しばらくお待ちください。
+                    </p>
                 </div>
             </form>
         </section>
@@ -504,6 +512,39 @@
             document.addEventListener("pointerdown", function (event) {
                 if (!wrap.contains(event.target)) hide();
             });
+        })();
+
+        // 送信中は「計算中…」にして、押したことが伝わるようにする。
+        // 気象庁への問い合わせで数秒かかるため、無反応に見えると二重に押されやすい。
+        (function () {
+            const form = document.getElementById("calc-form");
+            const button = document.getElementById("calc-button");
+            const label = button.querySelector(".calc-button-label");
+            const waiting = document.getElementById("calc-waiting");
+            const defaultLabel = label.textContent;
+
+            function startWaiting() {
+                button.classList.add("is-calculating");
+                label.textContent = "計算中…";
+                waiting.hidden = false;
+                // 押した直後にdisabledにするとSafariで送信が止まることがあるので、
+                // 送信が始まってから無効にして二重送信を防ぐ
+                setTimeout(function () { button.disabled = true; }, 0);
+            }
+
+            function reset() {
+                button.disabled = false;
+                button.classList.remove("is-calculating");
+                label.textContent = defaultLabel;
+                waiting.hidden = true;
+            }
+
+            // 必須項目が未入力ならsubmitイベント自体が起きないので、
+            // 「計算中」のまま固まることはない
+            form.addEventListener("submit", startWaiting);
+
+            // 戻るボタンで前の画面が復元されたときは、押せる状態に戻す
+            window.addEventListener("pageshow", reset);
         })();
 
         // ホーム画面に追加できるようにService Workerを登録する

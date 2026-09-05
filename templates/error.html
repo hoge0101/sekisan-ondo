@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ heading }} - 確かな積算温度計算(実測データ版)</title>
+    <meta name="robots" content="noindex">
+
+    <meta name="theme-color" content="#2b6ca8">
+    <link rel="icon" href="{{ url_for('static', filename='icons/favicon-32.png') }}" sizes="32x32">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="page">
+        <header class="hero">
+            <div class="hero-badge">🌡</div>
+            <div class="hero-text">
+                <h1>確かな積算温度計算<span class="hero-variant">(実測データ版)</span></h1>
+                <p class="subtitle">気象庁の観測地点データから、指定期間の積算温度を計算します</p>
+            </div>
+        </header>
+
+        <section class="card error-card">
+            <p class="error-code">{{ code }}</p>
+            <h2 class="error-heading">{{ heading }}</h2>
+            <p class="error-message">{{ message }}</p>
+            <p class="error-actions">
+                <a class="error-home-link" href="{{ url_for('index') }}">計算の画面にもどる</a>
+            </p>
+        </section>
+    </div>
+</body>
+</html>

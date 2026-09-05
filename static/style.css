@@ -832,3 +832,99 @@ button[type="submit"]:active {
     font-size: 0.9rem;
     color: var(--c-muted);
 }
+
+/* 計算中の見せ方。押したあと数秒かかるので、ボタン自体で待っていることを伝える */
+button[type="submit"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+}
+
+.calc-spinner {
+    display: none;
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: calc-spin 0.7s linear infinite;
+}
+
+button[type="submit"].is-calculating .calc-spinner {
+    display: block;
+}
+
+button[type="submit"]:disabled {
+    cursor: progress;
+    background: var(--c-cool-deep);
+    box-shadow: none;
+    opacity: 0.85;
+}
+
+button[type="submit"]:disabled:hover {
+    box-shadow: none;
+}
+
+@keyframes calc-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 目が回るのが苦手な人にはアニメーションを止める */
+@media (prefers-reduced-motion: reduce) {
+    .calc-spinner {
+        animation: none;
+    }
+}
+
+.calc-waiting {
+    margin: 9px 0 0;
+    font-size: 0.85rem;
+    color: var(--c-cool-deep);
+    text-align: center;
+}
+
+/* エラーページ(404・500) */
+.error-card {
+    text-align: center;
+}
+
+.error-code {
+    margin: 0;
+    font-size: 2.6rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--c-error-text);
+}
+
+.error-heading {
+    margin: 10px 0 0;
+    font-size: 1.2rem;
+    color: var(--c-cool-deep);
+}
+
+.error-message {
+    margin: 12px auto 0;
+    max-width: 30em;
+    color: var(--c-muted);
+    line-height: 1.8;
+}
+
+.error-actions {
+    margin: 22px 0 0;
+}
+
+.error-home-link {
+    display: inline-block;
+    padding: 11px 22px;
+    background: var(--c-cool-dark);
+    color: #fff;
+    border-radius: 9px;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 3px 10px rgba(43, 108, 168, 0.25);
+}
+
+.error-home-link:hover {
+    background: var(--c-cool-deep);
+}

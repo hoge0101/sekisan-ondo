@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, Response, send_from_directory
+from werkzeug.exceptions import HTTPException
 import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
@@ -118,7 +119,7 @@ def fetch_monthly_records(prec_no, area_code, year, month):
         url = f"https://www.data.jma.go.jp/stats/etrn/view/daily_a1.php?prec_no={prec_no}&block_no={area_code}&year={year}&month={month}&day=1&view="
         temp_col, precip_col, weather_col = 4, 1, None
 
-    response = requests.get(url)
+    response = requests.get(url, timeout=20)
     soup = BeautifulSoup(response.text, "html.parser")
 
     target_table = soup.find("table", class_="data2_s")
@@ -158,7 +159,7 @@ def fetch_normal_daily_temps(prec_no, area_code, month):
         url = f"https://www.data.jma.go.jp/stats/etrn/view/nml_sfc_d.php?prec_no={prec_no}&block_no={area_code}&year=&month={month}&day=1&view="
     else:
         url = f"https://www.data.jma.go.jp/stats/etrn/view/nml_amd_d.php?prec_no={prec_no}&block_no={area_code}&year=&month={month}&day=1&view="
-    response = requests.get(url)
+    response = requests.get(url, timeout=20)
     soup = BeautifulSoup(response.text, "html.parser")
 
     target_table = soup.find("table", class_="data2_s")
@@ -847,50 +848,68 @@ def index():
     form = request.form if request.method == "POST" else {}
 
     if request.method == "POST":
-        prec_no = request.form["prec_no"]
-        area_code = request.form["area_code"]
-        start_date = date.fromisoformat(request.form["start_date"])
-        base_temp = float(request.form.get("base_temp") or 0)
-        correction = float(request.form.get("correction") or 0)
-        end_mode = request.form.get("end_mode", "date")
-        use_anomaly = request.form.get("use_anomaly") == "1"
+        try:
+            prec_no = request.form["prec_no"]
+            area_code = request.form["area_code"]
+            start_date = date.fromisoformat(request.form["start_date"])
+            base_temp = float(request.form.get("base_temp") or 0)
+            correction = float(request.form.get("correction") or 0)
+            end_mode = request.form.get("end_mode", "date")
+            use_anomaly = request.form.get("use_anomaly") == "1"
 
-        if not area_code:
-            # 画面側でも必須にしているが、素通りすると0℃という紛らわしい結果になるため
-            error = "観測地点を選択してください"
-        elif end_mode == "target":
-            target_temp = float(request.form.get("target_temp") or 0)
-            if target_temp <= 0:
-                error = "目標積算温度は0より大きい値を指定してください"
+            if not area_code:
+                # 画面側でも必須にしているが、素通りすると0℃という紛らわしい結果になるため
+                error = "観測地点を選択してください"
+            elif end_mode == "target":
+                target_temp = float(request.form.get("target_temp") or 0)
+                if target_temp <= 0:
+                    error = "目標積算温度は0より大きい値を指定してください"
+                else:
+                    daily_series, reached = get_cumulative_series_until_target(
+                        prec_no, area_code, start_date, target_temp, base_temp, correction,
+                        use_anomaly=use_anomaly,
+                    )
+                    if not reached:
+                        error = "指定期間(3年)内に目標積算温度へ到達しませんでした。条件を見直してください。"
+                    elif daily_series:
+                        reached_date = daily_series[-1]["date"]
+                    result = daily_series[-1]["cumulative"] if daily_series else 0
+                    chart_svg, chart_points = build_chart_svg(daily_series)
             else:
-                daily_series, reached = get_cumulative_series_until_target(
-                    prec_no, area_code, start_date, target_temp, base_temp, correction,
-                    use_anomaly=use_anomaly,
-                )
-                if not reached:
-                    error = "指定期間(3年)内に目標積算温度へ到達しませんでした。条件を見直してください。"
-                elif daily_series:
-                    reached_date = daily_series[-1]["date"]
-                result = daily_series[-1]["cumulative"] if daily_series else 0
-                chart_svg, chart_points = build_chart_svg(daily_series)
-        else:
-            end_date = date.fromisoformat(request.form["end_date"])
-            if start_date > end_date:
-                error = "開始日は終了日より前の日付を指定してください"
-            else:
-                daily_series = get_cumulative_series(
-                    prec_no, area_code, start_date, end_date, base_temp, correction,
-                    use_anomaly=use_anomaly,
-                )
-                result = daily_series[-1]["cumulative"] if daily_series else 0
-                chart_svg, chart_points = build_chart_svg(daily_series)
+                end_date = date.fromisoformat(request.form["end_date"])
+                if start_date > end_date:
+                    error = "開始日は終了日より前の日付を指定してください"
+                else:
+                    daily_series = get_cumulative_series(
+                        prec_no, area_code, start_date, end_date, base_temp, correction,
+                        use_anomaly=use_anomaly,
+                    )
+                    result = daily_series[-1]["cumulative"] if daily_series else 0
+                    chart_svg, chart_points = build_chart_svg(daily_series)
 
-        if daily_series:
-            attach_weather(prec_no, area_code, daily_series)
-            summary = build_summary(daily_series)
-            station_name = get_station_name(prec_no, area_code)
-            if use_anomaly:
-                anomaly_note = build_anomaly_note(prec_no, area_code, daily_series)
+            if daily_series:
+                attach_weather(prec_no, area_code, daily_series)
+                summary = build_summary(daily_series)
+                station_name = get_station_name(prec_no, area_code)
+                if use_anomaly:
+                    anomaly_note = build_anomaly_note(prec_no, area_code, daily_series)
+
+        # 途中で失敗しても素のInternal Server Errorは出さず、いつもの画面のまま
+        # 理由を伝える。入力内容も残るので、そのまま押し直せる。
+        except requests.RequestException:
+            app.logger.exception("気象庁からのデータ取得に失敗しました")
+            error = (
+                "気象庁のデータを取得できませんでした。"
+                "気象庁のサイトが混み合っているのかもしれません。"
+                "少し時間をおいて、もう一度お試しください。"
+            )
+            result, daily_series, chart_svg, chart_points = None, None, None, []
+            reached_date, summary, station_name, anomaly_note = None, None, None, None
+        except Exception:
+            app.logger.exception("積算温度の計算に失敗しました")
+            error = "計算中に問題が起きました。入力内容を確かめて、もう一度お試しください。"
+            result, daily_series, chart_svg, chart_points = None, None, None, []
+            reached_date, summary, station_name, anomaly_note = None, None, None, None
 
     return render_template(
         "index.html",
@@ -1028,6 +1047,43 @@ def sitemap():
         "</urlset>\n"
     )
     return Response(body, mimetype="application/xml")
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """住所を間違えたときも、ブラウザ素のそっけない画面ではなくアプリの画面を出す"""
+    return render_template(
+        "error.html",
+        code=404,
+        heading="ページが見つかりません",
+        message="お探しのページは移動したか、URLが間違っている可能性があります。",
+        site_url=SITE_URL,
+    ), 404
+
+
+@app.errorhandler(500)
+@app.errorhandler(Exception)
+def internal_error(e):
+    """計算処理の外で想定外の例外が出たときの受け皿。
+
+    トップページの計算中に起きた失敗は index() 側で拾って画面内に出すので、
+    ここに来るのはそれ以外の想定外だけ。素のInternal Server Errorは見せない。
+    """
+    # HTTPException(404など)は各ハンドラ・既定の処理に任せる
+    if isinstance(e, HTTPException):
+        return e
+
+    app.logger.exception("想定外のエラーが発生しました")
+    return render_template(
+        "error.html",
+        code=500,
+        heading="エラーが発生しました",
+        message=(
+            "処理の途中で問題が起きました。"
+            "少し時間をおいて、もう一度お試しください。"
+        ),
+        site_url=SITE_URL,
+    ), 500
 
 
 if __name__ == "__main__":
