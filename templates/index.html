@@ -393,9 +393,55 @@
             populateStations(this.value, "");
         });
 
+        // 前回の入力のうち、地点と補正値だけをこの端末に覚えておく。
+        // 期間は前回の日付が残っていると紛らわしいので覚えない。
+        // 保存先は端末内のlocalStorageで、サーバーには送らない。
+        const LAST_INPUT_KEY = "sekisan-ondo:last-input";
+
+        function loadLastInput() {
+            // プライベートモードや設定によっては読み書きで例外が出るので、
+            // 失敗しても計算そのものは動くようにしておく
+            try {
+                return JSON.parse(localStorage.getItem(LAST_INPUT_KEY)) || {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveLastInput() {
+            try {
+                localStorage.setItem(LAST_INPUT_KEY, JSON.stringify({
+                    prec_no: prefectureSelect.value,
+                    area_code: stationSelect.value,
+                    base_temp: document.getElementById("base_temp").value,
+                    correction: document.getElementById("correction").value,
+                }));
+            } catch (e) {
+                // 覚えられなくても不便なだけなので、黙って諦める
+            }
+        }
+
+        document.getElementById("calc-form").addEventListener("submit", saveLastInput);
+
         // 計算結果表示後の再読み込み時に、選択済みの都道府県・観測地点を復元する
         if (prefectureSelect.value) {
             populateStations(prefectureSelect.value, selectedAreaCode);
+        } else {
+            // 新しく開いたときは、前回の地点と補正値を引き継ぐ。
+            // 計算直後の値のほうが確実なので、そちらが無いときだけ使う。
+            const last = loadLastInput();
+
+            // stations.json の更新で地点が消えていることがあるので、存在を確かめてから選ぶ
+            if (last.prec_no && stationsData[last.prec_no]) {
+                prefectureSelect.value = last.prec_no;
+                populateStations(last.prec_no, last.area_code || "");
+            }
+            if (last.base_temp) {
+                document.getElementById("base_temp").value = last.base_temp;
+            }
+            if (last.correction) {
+                document.getElementById("correction").value = last.correction;
+            }
         }
 
         // 終了日 / 積算温度指定の切り替え
