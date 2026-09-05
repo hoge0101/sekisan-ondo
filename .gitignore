@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+
+# 仮想環境。venv自身も中に.gitignoreを作るが、名前を変えても効くように書いておく
+venv/
+.venv/
+env/
+
+# Playwright MCP がスナップショットやスクリーンショットを吐く場所
+.playwright-mcp/
+
+# 動作確認用に撮ったスクリーンショット。
+# アプリで使う画像は static/icons/ にあるので、リポジトリ直下のPNGは作業用と見なす
+/*.png
+
+# エディタ・OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ローカル設定。SITE_URL などを .env に置く場合に備えて
+.env
